@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using VideoStreamBackend.Identity;
+using VideoStreamBackend.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(
 builder.Services.AddAuthorization()
     .AddCookiePolicy(opt => opt.MinimumSameSitePolicy = SameSiteMode.None);
 
-builder.Services.AddIdentityApiEndpoints<IdentityUser>(config => {
+builder.Services.AddIdentityApiEndpoints<ApplicationUser>(config => {
         config.SignIn.RequireConfirmedAccount = false;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -25,7 +26,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-app.MapIdentityApi<IdentityUser>();
+app.MapIdentityApi<ApplicationUser>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) {

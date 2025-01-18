@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace VideoStreamBackend.Migrations
 {
     /// <inheritdoc />
-    public partial class AddRooms : Migration
+    public partial class CreateRoom : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,7 +17,6 @@ namespace VideoStreamBackend.Migrations
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     OwnerId = table.Column<string>(type: "TEXT", nullable: true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
                     Name = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
