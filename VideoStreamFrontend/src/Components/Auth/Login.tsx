@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {RegisterBody} from "./Register.tsx";
 import {Button} from "@headlessui/react";
+import * as constants from "../../constants.tsx";
 
 export default function Login() {
     const [registerBody, setRegisterBody] = useState(new RegisterBody());
@@ -18,7 +19,7 @@ export default function Login() {
     }
 
     function handleLogin() {
-        fetch("https://localhost:7074/login?useCookies=true", {
+        fetch(`${constants.API_URL}/login?useCookies=true`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

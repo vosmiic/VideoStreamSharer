@@ -1,11 +1,14 @@
 import {useState} from "react";
 import {Button, Input} from "@headlessui/react";
+import * as constants from "../constants.tsx";
+import {useNavigate} from "react-router-dom";
 
 export default function Home() {
+    const navigation = useNavigate();
     const [roomName, setRoomName] = useState('');
     
     function handleSubmit() : void {
-        fetch("https://localhost:7074/room", {
+        fetch(`${constants.API_URL}/room`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -13,7 +16,17 @@ export default function Home() {
             body: '"' + roomName + '"',
             credentials: "include"
         }).then(
-            (response) => {console.log(response)}
+            (response) => {
+                if (response.ok) {
+                    response.text().then((result) => {
+                        const roomId : string = result.replaceAll('"', '');
+                        navigation(`./room/${roomId}`);
+                    })
+                } else {
+                    // todo display error
+                    console.error("Error creating room", response);
+                }
+            }
         )
     }
     

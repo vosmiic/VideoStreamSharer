@@ -1,6 +1,7 @@
 import Home from "./Components/Home.tsx";
 import Register from "./Components/Auth/Register.tsx";
 import Login from "./Components/Auth/Login.tsx";
+import Room from "./Components/Room.tsx";
 
 const AppRoutes = [
     {
@@ -15,6 +16,10 @@ const AppRoutes = [
     {
         element: <Login />,
         path: "/login",
+    },
+    {
+        element: <Room />,
+        path: "/room/:roomId",
     }
 ];
 
