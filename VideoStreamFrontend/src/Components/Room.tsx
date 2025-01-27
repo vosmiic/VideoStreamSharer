@@ -3,6 +3,9 @@ import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
 import {useParams} from "react-router-dom";
+import {IRoom} from "../Interfaces/IRoom.tsx";
+import YouTubePlayer from "./Players/YouTubePlayer.tsx";
+import Queue from "./Queue/Queue.tsx";
 
 export default function Room() {
     const params = useParams();
@@ -59,6 +62,17 @@ export default function Room() {
     function LoadedState() {
         return <>
             <p>Loaded {room.Name}</p>
+            <div className={"flex w-full"}>
+                <div className={"flex-auto w-20 bg-red-500"}>
+                    <Queue queueItems={room.Queue} />
+                </div>
+                <div className={"flex-none w-60 bg-yellow-500"}>
+                    <YouTubePlayer />
+                </div>
+                <div className={"flex-auto w-20 bg-blue-500"}>
+
+                </div>
+            </div>
         </>
     }
 
@@ -68,10 +82,4 @@ export default function Room() {
             {render}
         </>
     )
-}
-
-export interface IRoom {
-    Id: string;
-    OwnerId: string;
-    Name: string;
 }
