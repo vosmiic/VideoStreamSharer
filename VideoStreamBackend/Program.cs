@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
@@ -20,7 +19,9 @@ builder.Services.AddIdentityApiEndpoints<ApplicationUser>(config => {
     })
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => {
+    options.JsonSerializerOptions.PropertyNamingPolicy = null;
+});
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
