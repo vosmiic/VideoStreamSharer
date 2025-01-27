@@ -35,7 +35,7 @@ public class RoomController : Controller {
     [HttpGet]
     [Route("{roomId}")]
     public async Task<ActionResult> GetRoom([FromRoute] Guid roomId) {
-        var room = await _context.Rooms.FirstOrDefaultAsync(room => room.Id == roomId);
+        var room = await _context.Rooms.Include(room => room.Queue).FirstOrDefaultAsync(room => room.Id == roomId);
         return room != null ? Ok(room) : NotFound();
     }
 }
