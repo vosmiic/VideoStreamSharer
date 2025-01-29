@@ -6,6 +6,7 @@ import {useParams} from "react-router-dom";
 import {IRoom} from "../Interfaces/IRoom.tsx";
 import YouTubePlayer from "./Players/YouTubePlayer.tsx";
 import Queue from "./Queue/Queue.tsx";
+import {RoomContext} from "../Contexts/RoomContext.tsx";
 
 export default function Room() {
     const params = useParams();
@@ -60,7 +61,7 @@ export default function Room() {
     }, [loadState, room]);
 
     function LoadedState() {
-        return <>
+        return <RoomContext.Provider value={params.roomId}>
             <p>Loaded {room.Name}</p>
             <div className={"flex w-full"}>
                 <div className={"flex-auto w-20 bg-red-500"}>
@@ -73,7 +74,7 @@ export default function Room() {
 
                 </div>
             </div>
-        </>
+        </RoomContext.Provider>
     }
 
     return (
