@@ -1,4 +1,5 @@
 import * as constants from "../constants.tsx";
+import QueueAddBody from "../Models/QueueAdd.tsx";
 
 
 export async function GetRoom(roomId) {
@@ -8,4 +9,14 @@ export async function GetRoom(roomId) {
             "accept": "application/json"
         }
     })
+}
+
+export async function AddToQueue(request : QueueAddBody) {
+    return await fetch(`${constants.API_URL}/queue/${request.RoomId}/add`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: '"' + request.Url + '"'
+    });
 }

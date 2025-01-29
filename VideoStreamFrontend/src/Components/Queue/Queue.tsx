@@ -7,7 +7,7 @@ import {
     verticalListSortingStrategy
 } from "@dnd-kit/sortable";
 import QueueItem from "./QueueItem.tsx";
-
+import QueueAdd from "./QueueAdd.tsx";
 
 export default function Queue({queueItems}) {
     const [items, setItems] = useState(queueItems);
@@ -34,6 +34,8 @@ export default function Queue({queueItems}) {
     }
 
     return (
+        <div>
+        <QueueAdd />
         <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -44,5 +46,6 @@ export default function Queue({queueItems}) {
                 </SortableContext>
             </div>
         </DndContext>
+        </div>
     )
 }
