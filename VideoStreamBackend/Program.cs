@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
 
@@ -25,6 +26,8 @@ builder.Services.AddControllers().AddJsonOptions(options => {
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.MapIdentityApi<ApplicationUser>();
@@ -45,5 +48,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<PrimaryHub>("/hub");
 
 app.Run();
