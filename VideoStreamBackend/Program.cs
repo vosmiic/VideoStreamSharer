@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
@@ -27,6 +28,9 @@ builder.Services.AddControllers().AddJsonOptions(options => {
 builder.Services.AddOpenApi();
 
 builder.Services.AddSignalR();
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost"));
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
