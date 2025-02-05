@@ -1,3 +1,3 @@
-import {createContext} from "react";
+import {Context, createContext} from "react";
 
-export const RoomContext = createContext("");
+export const RoomContext : Context<string> = createContext("");

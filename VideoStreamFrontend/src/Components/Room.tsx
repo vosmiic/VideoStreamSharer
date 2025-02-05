@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useContext, useEffect, useState} from "react";
 import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
@@ -7,10 +7,12 @@ import {IRoom} from "../Interfaces/IRoom.tsx";
 import YouTubePlayer from "./Players/YouTubePlayer.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
+import {HubContext} from "../Contexts/HubContext.tsx";
 
 export default function Room() {
     const params = useParams();
-    const [room, setRoom] = useState<IRoom>({});
+    const hub = useContext(HubContext);
+    const [room, setRoom] = useState<IRoom>();
     const [render, setRender] = useState(Loading());
     const [loadState, setLoadState] = useState(0);
     /*
@@ -55,10 +57,16 @@ export default function Room() {
                 setRender(NotFound());
                 break;
             case 2:
-                setRender(LoadedState());
+                onLoaded();
                 break;
         }
     }, [loadState, room]);
+
+    function onLoaded() {
+        setRender(LoadedState());
+
+        hub.send("JoinedRoom", params.roomId);
+    }
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
