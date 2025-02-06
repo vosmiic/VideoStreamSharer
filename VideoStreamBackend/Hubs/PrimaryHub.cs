@@ -29,4 +29,9 @@ public class PrimaryHub : Hub {
         }
         _redis.HashSet(RedisKeys.RoomConnectionsKey(roomId), Context.ConnectionId, username);
     }
+
+    public override Task OnDisconnectedAsync(Exception? exception) {
+        _redis.HashDelete(RedisKeys.RoomConnectionsKey(Guid.Parse(Context.GetHttpContext().Request.Query["roomId"])), Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
 }
