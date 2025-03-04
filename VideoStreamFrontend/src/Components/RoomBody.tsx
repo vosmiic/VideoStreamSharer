@@ -7,6 +7,7 @@ import YouTubePlayer from "./Players/YouTubePlayer.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
+import {HubConnectionState} from "@microsoft/signalr";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -60,11 +61,25 @@ export default function RoomBody(params: {roomId: string}) {
         }
     }, [loadState, room]);
 
-    function onLoaded() {
+    async function onLoaded() {
         setRender(LoadedState());
 
-        hub.send("JoinedRoom", params.roomId);
+        if (hub.state == HubConnectionState.Disconnected) {
+            await hub.start();
+        }
+
+        while (true) {
+            if (hub.state == HubConnectionState.Connected) {
+                await hub.send("JoinedRoom", params.roomId);
+                return;
+            }
+            else {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
     }
+
+
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
