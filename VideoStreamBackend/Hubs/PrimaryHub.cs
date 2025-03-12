@@ -16,7 +16,12 @@ public class PrimaryHub : Hub {
     public async Task SendMessage(string message) =>
         await Clients.Client(Context.ConnectionId).SendAsync("ReceiveMessage", Context.ConnectionId);
 
-    public async Task JoinedRoom(Guid roomId) {
+    public override Task OnDisconnectedAsync(Exception? exception) {
+        _redis.HashDelete(RedisKeys.RoomConnectionsKey(Guid.Parse(Context.GetHttpContext().Request.Query["roomId"])), Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
+    
+    public override async Task OnConnectedAsync() {
         string? username = null;
         if (Context.User != null) {
             var user = await _userManager.GetUserAsync(Context.User);
@@ -27,11 +32,6 @@ public class PrimaryHub : Hub {
             // todo generate real random usernames
             username = Guid.NewGuid().ToString().Replace("-", "");
         }
-        _redis.HashSet(RedisKeys.RoomConnectionsKey(roomId), Context.ConnectionId, username);
-    }
-
-    public override Task OnDisconnectedAsync(Exception? exception) {
-        _redis.HashDelete(RedisKeys.RoomConnectionsKey(Guid.Parse(Context.GetHttpContext().Request.Query["roomId"])), Context.ConnectionId);
-        return base.OnDisconnectedAsync(exception);
+        _redis.HashSet(RedisKeys.RoomConnectionsKey(Guid.Parse(Context.GetHttpContext().Request.Query["roomId"])), Context.ConnectionId, username);
     }
 }
