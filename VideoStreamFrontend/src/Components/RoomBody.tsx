@@ -41,7 +41,14 @@ export default function RoomBody(params: {roomId: string}) {
                 });
         }
 
+        async function connectHub() {
+            if (hub.state == HubConnectionState.Disconnected) {
+                await hub.start();
+            }
+        }
+
         getRoom();
+        connectHub();
 
         return () => {
             ignore = true;
@@ -64,20 +71,6 @@ export default function RoomBody(params: {roomId: string}) {
 
     async function onLoaded() {
         setRender(LoadedState());
-
-        if (hub.state == HubConnectionState.Disconnected) {
-            await hub.start();
-        }
-
-        while (true) {
-            if (hub.state == HubConnectionState.Connected) {
-                await hub.send("JoinedRoom", params.roomId);
-                return;
-            }
-            else {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-        }
     }
 
 
