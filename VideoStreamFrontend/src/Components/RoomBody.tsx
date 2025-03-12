@@ -2,16 +2,17 @@ import {useContext, useEffect, useState} from "react";
 import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
-import {IRoom} from "../Interfaces/IRoom.tsx";
+import {GetRoomResponse} from "../Interfaces/IRoom.tsx";
 import YouTubePlayer from "./Players/YouTubePlayer.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
 import {HubConnectionState} from "@microsoft/signalr";
+import Users from "./Users.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
-    const [room, setRoom] = useState<IRoom>();
+    const [getRoom, setGetRoom] = useState<GetRoomResponse>();
     const [render, setRender] = useState(Loading());
     const [loadState, setLoadState] = useState(0);
     /*
@@ -30,7 +31,7 @@ export default function RoomBody(params: {roomId: string}) {
                     if (!ignore) {
                         if (response.status == 200) {
                             response.json().then(json => {
-                                setRoom(json as IRoom);
+                                setGetRoom(json as GetRoomResponse);
                                 setLoadState(2);
                             })
                         } else {
@@ -59,7 +60,7 @@ export default function RoomBody(params: {roomId: string}) {
                 onLoaded();
                 break;
         }
-    }, [loadState, room]);
+    }, [loadState, getRoom]);
 
     async function onLoaded() {
         setRender(LoadedState());
@@ -83,16 +84,16 @@ export default function RoomBody(params: {roomId: string}) {
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
-            <p>Loaded {room.Name}</p>
+            <p>Loaded {getRoom.Room.Name}</p>
             <div className={"flex w-full"}>
                 <div className={"flex-auto w-20 bg-red-500"}>
-                    <Queue queueItems={room.Queue} />
+                    <Queue queueItems={getRoom.Room.Queue} />
                 </div>
                 <div className={"flex-none w-60 bg-yellow-500"}>
                     <YouTubePlayer />
                 </div>
                 <div className={"flex-auto w-20 bg-blue-500"}>
-
+                    <Users users={getRoom.Users}/>
                 </div>
             </div>
         </RoomContext.Provider>
