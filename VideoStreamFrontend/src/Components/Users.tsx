@@ -1,6 +1,23 @@
+import {useContext, useEffect, useState} from "react";
+import {HubContext} from "../Contexts/HubContext.tsx";
+
 export default function Users(prop : { users: string[] }) {
+    const hub = useContext(HubContext);
+    const [users, setUsers] = useState<string[]>(prop.users);
+
+    useEffect(() => {
+        hub.on("AddUser", (username : string) => {
+            console.log(username);
+            setUsers([...users, username]);
+        });
+
+        hub.on("RemoveUser", (username : string) => {
+            setUsers(users.filter(user => user !== username));
+        });
+    }, [hub, users]);
+
     return <>
-        {prop.users.map(name => (
+        {users.map(name => (
             <p>{name}</p>
         ))}
     </>
