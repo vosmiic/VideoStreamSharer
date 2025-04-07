@@ -1,24 +1,29 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using VideoStreamBackend.Identity;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using VideoStreamBackend.Models;
+using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
+using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Controllers;
 
 [ApiController]
 [Route("[controller]")]
 public class QueueController : Controller {
-    private readonly ApplicationDbContext _context;
+    private readonly IRoomService _roomService;
+    private readonly IQueueItemService _queueItemService;
 
-    public QueueController(ApplicationDbContext context) {
-        _context = context;
+    public QueueController(IRoomService roomService, IQueueItemService queueItemService) {
+        _roomService = roomService;
+        _queueItemService = queueItemService;
     }
 
     [HttpPost]
     [Route("{roomId}/add")]
     public async Task<ActionResult> AddToQueue([FromRoute] Guid roomId, [FromBody] string url) {
-        var room = await _context.Rooms.FirstOrDefaultAsync(room => room.Id == roomId);
+        var room = await _roomService.GetRoomById(roomId);
         if (room == null) return new NotFoundResult();
         
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
@@ -37,7 +42,29 @@ public class QueueController : Controller {
             VideoId = videoId
         });
 
-        await _context.SaveChangesAsync();
+        await _roomService.SaveChanges();
+        return Ok();
+    }
+
+    [HttpPut]
+    [Route("{roomId}/order")]
+    public async Task<ActionResult> ChangeOrderOfQueue([FromRoute] Guid roomId, [FromBody] List<QueueOrderResponse> queue) {
+        Room? room = await _roomService.GetRoomById(roomId);
+        if (room == null) return new NotFoundResult();
+
+        foreach (QueueOrderResponse queueOrderResponse in queue) {
+            QueueItem? originalQueue = room.Queue.FirstOrDefault(q => q.Id == queueOrderResponse.Id);
+            if (originalQueue != null && originalQueue.Order != queueOrderResponse.Order) {
+                originalQueue.Order = queueOrderResponse.Order;
+            }
+        }
+        
+        if (room.Queue.Any(queue => room.Queue.Count(item => item.Order == queue.Order) > 1))
+        {
+            return BadRequest("Duplicate order");
+        }
+        
+        await _queueItemService.SaveChanges();
         return Ok();
     }
 }

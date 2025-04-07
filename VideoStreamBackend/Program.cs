@@ -3,6 +3,7 @@ using StackExchange.Redis;
 using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
+using VideoStreamBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,9 @@ builder.Services.AddSignalR();
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost"));
 builder.Services.AddHttpClient();
+
+builder.Services.AddScoped<IRoomService, RoomService>();
+builder.Services.AddScoped<IQueueItemService, QueueItemService>();
 
 var app = builder.Build();
 
