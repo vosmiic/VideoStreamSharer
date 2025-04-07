@@ -12,8 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 //     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 
 builder.Services.AddDbContext<ApplicationDbContext>(
-    options => options.UseSqlite("Data Source=database.db"));
-
+    options => {
+        options.UseLazyLoadingProxies().UseSqlite("Data Source=database.db");
+        options.EnableSensitiveDataLogging();
+    });
 builder.Services.AddAuthorization()
     .AddCookiePolicy(opt => opt.MinimumSameSitePolicy = SameSiteMode.None);
 
