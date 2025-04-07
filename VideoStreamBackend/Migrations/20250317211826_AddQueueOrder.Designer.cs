@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VideoStreamBackend.Identity;
 
@@ -10,9 +11,11 @@ using VideoStreamBackend.Identity;
 namespace VideoStreamBackend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250317211826_AddQueueOrder")]
+    partial class AddQueueOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -241,7 +244,7 @@ namespace VideoStreamBackend.Migrations
 
                     b.HasIndex("RoomId");
 
-                    b.ToTable("QueueItems", (string)null);
+                    b.ToTable("QueueItems");
 
                     b.HasDiscriminator<string>("Type").HasValue("QueueItem");
 
@@ -266,7 +269,7 @@ namespace VideoStreamBackend.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Rooms", (string)null);
+                    b.ToTable("Rooms");
                 });
 
             modelBuilder.Entity("VideoStreamBackend.Models.PlayableType.UploadedMedia", b =>
