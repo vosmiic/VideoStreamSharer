@@ -7,7 +7,6 @@ export default function Users(prop : { users: string[] }) {
 
     useEffect(() => {
         hub.on("AddUser", (username : string) => {
-            console.log(username);
             setUsers([...users, username]);
         });
 
@@ -18,7 +17,7 @@ export default function Users(prop : { users: string[] }) {
 
     return <>
         {users.map(name => (
-            <p>{name}</p>
+            <p key={name}>{name}</p>
         ))}
     </>
 }
