@@ -7,7 +7,6 @@ export interface GetRoomResponse {
 
 export interface IRoom {
     Id: string;
-    OwnerId: string;
     Name: string;
     Queue: Array<IQueue>;
 }

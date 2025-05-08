@@ -82,8 +82,8 @@ export default function RoomBody(params: {roomId: string}) {
                 <div className={"flex-auto w-20 bg-red-500"}>
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
-                <div className={"flex-none w-60 bg-yellow-500"}>
-                    <YouTubePlayer />
+                <div className={"flex-auto w-60 bg-yellow-500"}>
+                    <YouTubePlayer videoId={getRoom.Room.Queue.reduce((first, second) => first.Order < second.Order ? first : second).ItemLink} />
                 </div>
                 <div className={"flex-auto w-20 bg-blue-500"}>
                     <Users users={getRoom.Users}/>
