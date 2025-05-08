@@ -7,6 +7,7 @@ using StackExchange.Redis;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
+using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Redis;
 
 namespace VideoStreamBackend.Controllers;
@@ -47,7 +48,18 @@ public class RoomController : Controller {
         var connections = _redis.HashGetAll(RedisKeys.RoomConnectionsKey(roomId));
         
         return Ok(new GetRoomResponse {
-            Room = room,
+            Room = new RoomApiModel {
+                Id = room.Id,
+                Name = room.Name,
+                Queue = room.Queue.Select(q => new QueueItemApiModel {
+                    Id = q.Id,
+                    Title = q.Title,
+                    ThumbnailLocation = q.ThumbnailLocation,
+                    Order = q.Order,
+                    ItemLink = q is YouTubeVideo youTubeVideo ? youTubeVideo.VideoId : ((UploadedMedia)q).Path,
+                    Type = q.GetType().Name
+                })
+            },
             Users = connections.Length > 0 ? connections.Select(connection => connection.Value.ToString()) : Array.Empty<string>()
         });
     }
