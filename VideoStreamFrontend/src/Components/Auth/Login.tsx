@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {RegisterBody} from "./Register.tsx";
 import {Button} from "@headlessui/react";
-import * as constants from "../../constants.tsx";
+import * as constants from "../../Constants/constants.tsx";
 
 export default function Login() {
     const [registerBody, setRegisterBody] = useState(new RegisterBody());

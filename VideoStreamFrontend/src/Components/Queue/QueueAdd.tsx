@@ -3,6 +3,7 @@ import {Button, Input} from "@headlessui/react";
 import {AddToQueue} from "../../Helpers/ApiCalls.tsx";
 import QueueAddBody from "../../Models/QueueAdd.tsx";
 import {RoomContext} from "../../Contexts/RoomContext.tsx";
+import {HubContext} from "../../Contexts/HubContext.tsx";
 
 export default function QueueAdd() {
     const roomId : string = useContext(RoomContext);

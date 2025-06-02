@@ -1,6 +1,6 @@
 import {HubContext} from "../Contexts/HubContext.tsx";
 import {HubConnectionBuilder, HubConnectionState} from "@microsoft/signalr";
-import {API_URL} from "../constants.tsx";
+import {API_URL} from "../Constants/constants.tsx";
 import {useParams} from "react-router-dom";
 import RoomBody from "./RoomBody.tsx";
 

@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {Button, Input} from "@headlessui/react";
-import * as constants from "../constants.tsx";
+import * as constants from "../Constants/constants.tsx";
 import {useNavigate} from "react-router-dom";
 
 export default function Home() {

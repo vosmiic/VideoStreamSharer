@@ -1,4 +1,4 @@
-import * as constants from "../constants.tsx";
+import * as constants from "../Constants/constants.tsx";
 import QueueAddBody from "../Models/QueueAdd.tsx";
 import QueueOrder from "../Models/QueueOrder.tsx";
 
