@@ -10,5 +10,5 @@ public class RoomService (ApplicationDbContext context) : IRoomService {
     public async Task SaveChanges() => await context.SaveChangesAsync();
     
     public async Task<Room?> GetRoomById(Guid id) =>
-        await _rooms.Include(room => room.Queue).FirstOrDefaultAsync(room => room.Id == id);
+        await _rooms.Include(room => room.Queue).FirstOrDefaultAsync(room => room.Id.CompareTo(id) == 0);
 }
