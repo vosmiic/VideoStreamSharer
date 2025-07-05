@@ -9,6 +9,7 @@ using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Redis;
+using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Controllers;
 
@@ -18,10 +19,12 @@ public class RoomController : Controller {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IDatabase _redis;
+    private readonly IRoomService _roomService;
 
-    public RoomController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConnectionMultiplexer connectionMultiplexer) {
+    public RoomController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IConnectionMultiplexer connectionMultiplexer, IRoomService roomService) {
         _context = context;
         _userManager = userManager;
+        _roomService = roomService;
         _redis = connectionMultiplexer.GetDatabase();
     }
 
@@ -56,7 +59,7 @@ public class RoomController : Controller {
                     Title = q.Title,
                     ThumbnailLocation = q.ThumbnailLocation,
                     Order = q.Order,
-                    ItemLink = q is YouTubeVideo youTubeVideo ? youTubeVideo.VideoId : ((UploadedMedia)q).Path,
+                    ItemLink = q is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl.AbsoluteUri : ((UploadedMedia)q).Path,
                     Type = q.GetType().Name
                 })
             },
