@@ -2,9 +2,11 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
+using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Controllers;
@@ -26,6 +28,16 @@ public class QueueController : Controller {
         var room = await _roomService.GetRoomById(roomId);
         if (room == null) return new NotFoundResult();
         
+        Uri uri = new Uri(url);
+        YtDlpHelper ytDlpHelper = new YtDlpHelper();
+        (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri);
+        if (!videoInfo.success || videoInfo.videoInfo == null) return new BadRequestObjectResult($"Error: {videoInfo.error}");
+        room.Queue.Add(new YouTubeVideo {
+            Title = videoInfo.videoInfo.Title,
+            VideoUrl = uri
+        });
+        await _roomService.SaveChanges();
+        /* Old youtube solution
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
 
         MatchCollection matchCollection = regex.Matches(url);
@@ -42,7 +54,7 @@ public class QueueController : Controller {
             VideoId = videoId
         });
 
-        await _roomService.SaveChanges();
+        await _roomService.SaveChanges();*/
         return Ok();
     }
 
