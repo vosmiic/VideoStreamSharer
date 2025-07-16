@@ -1,13 +1,15 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
+using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
 
@@ -48,18 +50,33 @@ public class RoomController : Controller {
         var room = await _context.Rooms.Include(room => room.Queue).FirstOrDefaultAsync(room => room.Id == roomId);
         if (room == null) return NotFound();
         
-        var connections = _redis.HashGetAll(RedisKeys.RoomConnectionsKey(roomId));
+        var connections = await _redis.HashGetAllAsync(RedisKeys.RoomConnectionsKey(roomId));
+
+        RedisValue? urls = await _redis.HashGetAsync(RedisKeys.RoomKey(roomId), RedisKeys.RoomCurrentVideoField());
+        List<StreamUrl> streamUrls = new List<StreamUrl>();
+        if (urls.HasValue && urls.Value.HasValue) {
+            // retrieve the urls
+            var xd = urls.Value.ToString();
+            streamUrls = JsonSerializer.Deserialize<List<StreamUrl>>(xd);
+        } else {
+            // store the video in redis for others
+            YtDlpHelper ytDlpHelper = new YtDlpHelper();
+            var result = await ytDlpHelper.GetVideoUrls(room.CurrentVideo() is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl : null);
+            if (!result.success) return new StatusCodeResult(500);
+            _redis.HashSet(roomId.ToString(), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(result.urls));
+            streamUrls = result.urls;
+        }
         
         return Ok(new GetRoomResponse {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
+                StreamUrls = streamUrls,
                 Queue = room.Queue.Select(q => new QueueItemApiModel {
                     Id = q.Id,
                     Title = q.Title,
                     ThumbnailLocation = q.ThumbnailLocation,
                     Order = q.Order,
-                    ItemLink = q is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl.AbsoluteUri : ((UploadedMedia)q).Path,
                     Type = q.GetType().Name
                 })
             },
