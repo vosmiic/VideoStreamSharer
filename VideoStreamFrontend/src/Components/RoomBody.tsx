@@ -3,12 +3,12 @@ import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
 import {GetRoomResponse} from "../Interfaces/IRoom.tsx";
-import YouTubePlayer from "./Players/YouTubePlayer.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
 import {HubConnectionState} from "@microsoft/signalr";
 import Users from "./Users.tsx";
+import FilePlayer from "./Players/FilePlayer.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -53,7 +53,7 @@ export default function RoomBody(params: {roomId: string}) {
         return () => {
             ignore = true;
         }
-    }, [params.roomId]);
+    }, [params.roomId, hub]);
 
     useEffect(() => {
         switch (loadState) {
@@ -73,8 +73,6 @@ export default function RoomBody(params: {roomId: string}) {
         setRender(LoadedState());
     }
 
-
-
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
             <p>Loaded {getRoom.Room.Name}</p>
@@ -83,7 +81,7 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
                 <div className={"flex-auto w-60 bg-yellow-500"}>
-                    <YouTubePlayer videoId={getRoom.Room.Queue.reduce((first, second) => first.Order < second.Order ? first : second).ItemLink} />
+                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} />
                 </div>
                 <div className={"flex-auto w-20 bg-blue-500"}>
                     <Users users={getRoom.Users}/>
