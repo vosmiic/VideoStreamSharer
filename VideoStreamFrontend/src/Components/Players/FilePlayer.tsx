@@ -10,19 +10,45 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
     const [urls, setUrls] = useState(params.streamUrls);
 
     useEffect(() => {
-        videoPlayerRef.current.addEventListener("play", () => {
-            audioPlayerRef.current.play();
-        })
-
-        videoPlayerRef.current.addEventListener("pause", () => {
-            audioPlayerRef.current.pause();
-        })
+        syncControl();
 
         hub.on("LoadVideo", (urlsOfNextVideo : StreamUrl[] | null) => {
             if (urlsOfNextVideo != null) {
                 setUrls(urlsOfNextVideo);
             }
         })
+
+        function syncControl() {
+            videoPlayerRef.current.addEventListener("play", () => {
+                console.log("play")
+                console.log(videoPlayerRef.current.seeking)
+                if (!videoPlayerRef.current.seeking) {
+                    audioPlayerRef.current.play();
+                }
+            });
+
+            videoPlayerRef.current.addEventListener("pause", () => {
+                console.log("pause")
+                audioPlayerRef.current.pause();
+            });
+
+            videoPlayerRef.current.addEventListener("seeked", () => {
+                console.log("seeked")
+                audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+                audioPlayerRef.current.play();
+            });
+
+            videoPlayerRef.current.addEventListener("ratechange", () => {
+                console.log("ratechange")
+                audioPlayerRef.current.playbackRate = videoPlayerRef.current.playbackRate;
+            });
+
+            videoPlayerRef.current.addEventListener("seeking", () => {
+                console.log("seeking")
+                audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+                audioPlayerRef.current.pause();
+            });
+        }
     }, [hub]);
 
 
