@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -8,8 +7,6 @@ using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
-using VideoStreamBackend.Models.PlayableType;
-using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
 
@@ -52,26 +49,11 @@ public class RoomController : Controller {
         
         var connections = await _redis.HashGetAllAsync(RedisKeys.RoomConnectionsKey(roomId));
 
-        RedisValue? urls = await _redis.HashGetAsync(RedisKeys.RoomKey(roomId), RedisKeys.RoomCurrentVideoField());
-        List<StreamUrl> streamUrls = new List<StreamUrl>();
-        if (urls.HasValue && urls.Value.HasValue) {
-            // retrieve the urls
-            var xd = urls.Value.ToString();
-            streamUrls = JsonSerializer.Deserialize<List<StreamUrl>>(xd);
-        } else {
-            // store the video in redis for others
-            YtDlpHelper ytDlpHelper = new YtDlpHelper();
-            var result = await ytDlpHelper.GetVideoUrls(room.CurrentVideo() is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl : null);
-            if (!result.success) return new StatusCodeResult(500);
-            _redis.HashSet(roomId.ToString(), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(result.urls));
-            streamUrls = result.urls;
-        }
-        
         return Ok(new GetRoomResponse {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
-                StreamUrls = streamUrls,
+                StreamUrls = await RoomHelper.GetStreamUrls(_redis, room),
                 Queue = room.Queue.Select(q => new QueueItemApiModel {
                     Id = q.Id,
                     Title = q.Title,
