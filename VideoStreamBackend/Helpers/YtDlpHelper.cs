@@ -1,13 +1,19 @@
+using System.Collections.Specialized;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 using CliWrap;
 using CliWrap.Buffered;
+using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models.YtDlp;
 
 namespace VideoStreamBackend.Helpers;
 
 public class YtDlpHelper {
-    public YtDlpHelper() {
+    private readonly ICliWrapper _cliWrapper;
+    private readonly string YtDlpFilePath = "yt-dlp"; // todo this should be changed to be user customizable
+    public YtDlpHelper(ICliWrapper cliWrapper) {
+        _cliWrapper = cliWrapper;
         // confirm yt-dlp is installed and available
         StringBuilder errorOutput = new StringBuilder();
         var result = Cli.Wrap("yt-dlp")
@@ -20,16 +26,9 @@ public class YtDlpHelper {
         }
     }
 
-    public async Task<(VideoInfo? videoInfo, bool success, string? error)> GetVideoInfo(Uri uri) {
-        StringBuilder standardOutput = new StringBuilder();
-        StringBuilder errorOutput = new StringBuilder();
+    public async Task<(VideoInfo? videoInfo, bool success, string? error)> GetVideoInfo(Uri uri, StringBuilder standardOutput, StringBuilder errorOutput) {
         var argument = $"-q -O \"%(.{{{nameof(VideoInfo.Title).ToLower()}}})j\" {uri}";
-        var result = await Cli.Wrap("yt-dlp")
-            .WithArguments(argument)
-            .WithStandardOutputPipe(PipeTarget.ToStringBuilder(standardOutput))
-            .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorOutput))
-            .ExecuteBufferedAsync();
-        
+        var result = await _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, argument, PipeTarget.ToStringBuilder(standardOutput), PipeTarget.ToStringBuilder(errorOutput));
         if (!result.IsSuccess) return (null, result.IsSuccess, errorOutput.ToString());
         
         VideoInfo? videoInfo = JsonSerializer.Deserialize<VideoInfo>(standardOutput.ToString());
@@ -38,28 +37,23 @@ public class YtDlpHelper {
         return (videoInfo, true, null);
     }
 
-    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(Uri uri) {
-        StringBuilder standardOutput = new StringBuilder();
-        StringBuilder errorOutput = new StringBuilder();
-        
+    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(Uri uri, StringBuilder standardOutput, StringBuilder errorOutput) {
         var argument = $"-q -g \"{uri}\" -f \"bv+ba\"";
-        var result = await Cli.Wrap("yt-dlp")
-            .WithArguments(argument)
-            .WithStandardOutputPipe(PipeTarget.ToStringBuilder(standardOutput))
-            .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorOutput))
-            .ExecuteBufferedAsync();
+        var result = await _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, argument, PipeTarget.ToStringBuilder(standardOutput), PipeTarget.ToStringBuilder(errorOutput));
         
         if (!result.IsSuccess) return (null, result.IsSuccess, errorOutput.ToString());
         var urls = standardOutput.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         List<StreamUrl> streamUrls = new List<StreamUrl>();
-        streamUrls.Add(new StreamUrl {
-            Url = urls[0],
-            StreamType = StreamType.Video
-        });
-        streamUrls.Add(new StreamUrl {
-            Url = urls[1],
-            StreamType = StreamType.Audio
-        });
+        foreach (string url in urls) {
+            Uri streamUri = new Uri(url);
+            NameValueCollection parameters = HttpUtility.ParseQueryString(streamUri.Query);
+            string? expiry = parameters.Get("expire");
+            streamUrls.Add(new StreamUrl {
+                Url = url,
+                StreamType = Array.IndexOf(urls, url) == 0 ? StreamType.Video : StreamType.Audio,
+                Expiry = expiry != null && long.TryParse(expiry, out long unixTime) ? unixTime : DateTimeOffset.UtcNow.AddHours(6).ToUnixTimeSeconds()
+            });
+        }
         
         return (streamUrls, result.IsSuccess, null);
     }

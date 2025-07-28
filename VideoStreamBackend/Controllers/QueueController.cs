@@ -1,8 +1,10 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VideoStreamBackend.Helpers;
+using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
@@ -29,8 +31,10 @@ public class QueueController : Controller {
         if (room == null) return new NotFoundResult();
         
         Uri uri = new Uri(url);
-        YtDlpHelper ytDlpHelper = new YtDlpHelper();
-        (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri);
+        YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
+        StringBuilder standardOutput = new StringBuilder();
+        StringBuilder errorOutput = new StringBuilder();
+        (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
         if (!videoInfo.success || videoInfo.videoInfo == null) return new BadRequestObjectResult($"Error: {videoInfo.error}");
         room.Queue.Add(new YouTubeVideo {
             Title = videoInfo.videoInfo.Title,
