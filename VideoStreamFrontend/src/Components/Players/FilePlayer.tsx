@@ -51,6 +51,10 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
         }
     }, [hub]);
 
+    function changeVolume(element) {
+        audioPlayerRef.current.volume = element.target.value / 100;
+    }
+
 
     return (
         <div id="player">
@@ -60,6 +64,7 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
             <audio ref={audioPlayerRef} preload={"auto"}>
                 <source src={urls.find(url => url.StreamType === StreamType.Audio)?.Url} />
             </audio>
+            <input type={"range"} onChange={changeVolume} />
         </div>
     )
 }
