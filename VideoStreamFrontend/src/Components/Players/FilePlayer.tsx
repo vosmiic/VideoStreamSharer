@@ -23,14 +23,23 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
                 videoPlayerRef.current.pause();
                 audioPlayerRef.current.pause();
             }
+        });
+
+        hub.on("PlayVideo", () => {
+            if (videoPlayerRef.current.paused) {
+                videoPlayerRef.current.play();
+                audioPlayerRef.current.play();
+            }
         })
 
         function syncControl() {
-            videoPlayerRef.current.addEventListener("play", () => {
+            videoPlayerRef.current.addEventListener("play", (event) => {
                 console.log("play")
                 console.log(videoPlayerRef.current.seeking)
                 if (!videoPlayerRef.current.seeking) {
                     audioPlayerRef.current.play();
+                    if (event.isTrusted)
+                        hub.send("PlayVideo");
                 }
             });
 
