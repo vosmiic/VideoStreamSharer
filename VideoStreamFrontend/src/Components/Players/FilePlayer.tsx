@@ -27,8 +27,14 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
 
         hub.on("PlayVideo", () => {
             if (videoPlayerRef.current.paused) {
-                videoPlayerRef.current.play();
-                audioPlayerRef.current.play();
+                videoPlayerRef.current.play().catch(() => {
+                    audioPlayerRef.current.volume = 0;
+                    audioPlayerRef.current.play();
+                });
+                audioPlayerRef.current.play().catch(() => {
+                    audioPlayerRef.current.volume = 0;
+                    audioPlayerRef.current.play();
+                });
             }
         })
 
@@ -37,7 +43,10 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
                 console.log("play")
                 console.log(videoPlayerRef.current.seeking)
                 if (!videoPlayerRef.current.seeking) {
-                    audioPlayerRef.current.play();
+                    audioPlayerRef.current.play().catch(() => {
+                        audioPlayerRef.current.volume = 0;
+                        audioPlayerRef.current.play();
+                    });
                     if (event.isTrusted)
                         hub.send("PlayVideo");
                 }
@@ -53,7 +62,10 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
             videoPlayerRef.current.addEventListener("seeked", () => {
                 console.log("seeked")
                 audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
-                audioPlayerRef.current.play();
+                audioPlayerRef.current.play().catch(() => {
+                    audioPlayerRef.current.volume = 0;
+                    audioPlayerRef.current.play();
+                });
             });
 
             videoPlayerRef.current.addEventListener("ratechange", () => {
