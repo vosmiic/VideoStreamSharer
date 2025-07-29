@@ -12,4 +12,9 @@ public class QueueItemService (ApplicationDbContext context) : IQueueItemService
     public void BulkAddOrUpdate(ICollection<QueueItem> queueItems) {
         _queueItems.UpdateRange(queueItems);
     }
+
+    public async Task Remove(QueueItem queueItem) {
+        _queueItems.Remove(queueItem);
+        await context.SaveChangesAsync();
+    }
 }
