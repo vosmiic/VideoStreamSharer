@@ -16,6 +16,13 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
             if (urlsOfNextVideo != null) {
                 setUrls(urlsOfNextVideo);
             }
+        });
+
+        hub.on("PauseVideo", () => {
+            if (!videoPlayerRef.current.paused) {
+                videoPlayerRef.current.pause();
+                audioPlayerRef.current.pause();
+            }
         })
 
         function syncControl() {
@@ -27,9 +34,11 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
                 }
             });
 
-            videoPlayerRef.current.addEventListener("pause", () => {
-                console.log("pause")
+            videoPlayerRef.current.addEventListener("pause", (event) => {
+                console.log("pause");
                 audioPlayerRef.current.pause();
+                if (event.isTrusted)
+                    hub.send("PauseVideo");
             });
 
             videoPlayerRef.current.addEventListener("seeked", () => {

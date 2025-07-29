@@ -24,6 +24,7 @@ public class PrimaryHub : Hub {
     private readonly string StatusChangeMethod = "StatusChange";
     private readonly string LoadVideoMethod = "LoadVideo";
     private readonly string PauseVideoMethod = "PauseVideo";
+    private readonly string PlayVideoMethod = "PlayVideo";
 
     #endregion
 
@@ -90,16 +91,10 @@ public class PrimaryHub : Hub {
     }
 
     [AllowAnonymous]
-    public async Task PauseVideo() {
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        Room? room = await _roomService.GetRoomById(roomId);
-        if (room == null) return;
-        room.Status = Status.Paused;
-        await _roomService.SaveChanges();
-        QueueItem? currentVideo = room?.CurrentVideo();
-        if (currentVideo == null) return;
-        await SendToAllRoomClients(roomId, PauseVideoMethod, null);
-    }
+    public async Task PauseVideo() => await StatusUpdate(Status.Paused);
+
+    [AllowAnonymous]
+    public async Task PlayVideo() => await StatusUpdate(Status.Playing);
 
     [AllowAnonymous]
     public async Task FinishedVideo() {
@@ -125,5 +120,26 @@ public class PrimaryHub : Hub {
         foreach (HashEntry connection in connections) {
             await Clients.Client(connection.Name).SendAsync(method, data);
         }
+    }
+    
+    private async Task StatusUpdate(Status status) {
+        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
+        Room? room = await _roomService.GetRoomById(roomId);
+        if (room == null) return;
+        room.Status = status;
+        await _roomService.SaveChanges();
+        QueueItem? currentVideo = room?.CurrentVideo();
+        if (currentVideo == null) return;
+        string? method = null;
+        switch (status) {
+            case Status.Playing:
+                method = PlayVideoMethod;
+                break;
+            case Status.Paused:
+                method = PauseVideoMethod;
+                break;
+        }
+        if (method != null)
+            await SendToAllRoomClients(roomId, method, null);
     }
 }
