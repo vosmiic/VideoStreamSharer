@@ -9,6 +9,7 @@ import {HubContext} from "../Contexts/HubContext.tsx";
 import {HubConnectionState} from "@microsoft/signalr";
 import Users from "./Users.tsx";
 import FilePlayer from "./Players/FilePlayer.tsx";
+import {VideoStatus} from "../Constants/constants.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -81,7 +82,7 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
                 <div className={"flex-auto w-60 bg-yellow-500"}>
-                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} />
+                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing}/>
                 </div>
                 <div className={"flex-auto w-20 bg-blue-500"}>
                     <Users users={getRoom.Users}/>

@@ -3,11 +3,24 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 
-export default function FilePlayer(params: {streamUrls : Array<StreamUrl>}) {
+export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autoplay : boolean}) {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>(null);
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
     const [urls, setUrls] = useState(params.streamUrls);
+
+    useEffect(() => {
+        if (params.autoplay) {
+            videoPlayerRef.current.play().catch(() => {
+                audioPlayerRef.current.volume = 0;
+                audioPlayerRef.current.play();
+            });
+            audioPlayerRef.current.play().catch(() => {
+                audioPlayerRef.current.volume = 0;
+                audioPlayerRef.current.play();
+            });
+        }
+    });
 
     useEffect(() => {
         syncControl();
