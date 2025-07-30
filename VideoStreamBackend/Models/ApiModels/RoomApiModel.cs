@@ -6,4 +6,5 @@ public class RoomApiModel() : GuidPrimaryKey {
     public string Name { get; set; }
     public IEnumerable<QueueItemApiModel> Queue { get; set; }
     public IEnumerable<StreamUrl>? StreamUrls { get; set; }
+    public Status Status { get; set; }
 }

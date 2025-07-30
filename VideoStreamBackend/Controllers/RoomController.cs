@@ -54,6 +54,7 @@ public class RoomController : Controller {
                 Id = room.Id,
                 Name = room.Name,
                 StreamUrls = await RoomHelper.GetStreamUrls(_redis, room),
+                Status = room.Status,
                 Queue = room.Queue.Select(q => new QueueItemApiModel {
                     Id = q.Id,
                     Title = q.Title,
