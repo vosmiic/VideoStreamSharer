@@ -95,7 +95,10 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
     }, [hub]);
 
     function changeVolume(element) {
+        var paused = !audioPlayerRef.current.paused && videoPlayerRef.current.paused; // covers odd behavior where audio plays automatically when changing volume
         audioPlayerRef.current.volume = element.target.value / 100;
+        if (paused)
+            audioPlayerRef.current.pause();
     }
 
 
