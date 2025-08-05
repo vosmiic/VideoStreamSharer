@@ -18,8 +18,9 @@ public class RoomHelper {
     /// <param name="room">Instance of <see cref="Room"/> to get the stream URLs of.</param>
     /// <returns>List of <see cref="StreamUrl"/>s.</returns>
     internal static async Task<List<StreamUrl>?> GetStreamUrls(IDatabase redis, Room room) {
-        RedisValue? videoUrlFromRedis = await redis.HashGetAsync(RedisKeys.RoomKey(room.Id), RedisKeys.RoomCurrentVideoField());
-        RedisValue? audioUrlFromRedis = await redis.HashGetAsync(RedisKeys.RoomKey(room.Id), RedisKeys.RoomCurrentAudioField());
+        string roomId = room.Id.ToString();
+        RedisValue? videoUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentVideoField());
+        RedisValue? audioUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentAudioField());
         
         List<StreamUrl> streamUrls = new List<StreamUrl>();
         if (videoUrlFromRedis is { HasValue: true } || audioUrlFromRedis is { HasValue: true }) {
@@ -43,15 +44,13 @@ public class RoomHelper {
 
             foreach (StreamUrl streamUrl in result.urls) {
                 if (streamUrl.StreamType == StreamType.Video) {
-                    redis.HashSet(room.Id.ToString(), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(room.Id.ToString(), [ RedisKeys.RoomCurrentVideoField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
-                    break;
+                    redis.HashSet(roomId, RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(streamUrl));
+                    await redis.HashFieldExpireAsync(roomId, [ RedisKeys.RoomCurrentVideoField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
                 }
 
                 if (streamUrl.StreamType == StreamType.Audio) {
-                    redis.HashSet(room.Id.ToString(), RedisKeys.RoomCurrentAudioField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(room.Id.ToString(), [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
-                    break;
+                    redis.HashSet(roomId, RedisKeys.RoomCurrentAudioField(), JsonSerializer.Serialize(streamUrl));
+                    await redis.HashFieldExpireAsync(roomId, [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
                 }
             }
             
