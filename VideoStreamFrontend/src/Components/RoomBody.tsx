@@ -82,7 +82,7 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
                 <div className={"flex-auto w-60 bg-yellow-500"}>
-                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing}/>
+                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing} startTime={getRoom?.Room.CurrentTime}/>
                 </div>
                 <div className={"flex-auto w-20 bg-blue-500"}>
                     <Users users={getRoom.Users}/>

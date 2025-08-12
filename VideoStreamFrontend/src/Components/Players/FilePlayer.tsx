@@ -3,7 +3,7 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 
-export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autoplay : boolean}) {
+export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autoplay : boolean, startTime : number}) {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>(null);
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
@@ -19,6 +19,17 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
             });
+        }
+
+        setInterval(() => {
+            if (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+                hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime);
+            }
+        }, 1000);
+
+        if (params.startTime > 0) {
+            videoPlayerRef.current.currentTime = params.startTime;
+            audioPlayerRef.current.currentTime = params.startTime;
         }
     });
 
@@ -49,7 +60,15 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
                     audioPlayerRef.current.play();
                 });
             }
-        })
+        });
+
+        hub.on("TimeUpdate", (time : number) => {
+            if (videoPlayerRef.current.currentTime < time - 1 || videoPlayerRef.current.currentTime > time + 1) {
+                videoPlayerRef.current.currentTime = time;
+                audioPlayerRef.current.currentTime = time;
+                console.log("out of sync, seeking")
+            }
+        });
 
         function syncControl() {
             videoPlayerRef.current.addEventListener("play", (event) => {
@@ -91,6 +110,15 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
                 audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
                 audioPlayerRef.current.pause();
             });
+
+            setInterval(() => {
+                if ((videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
+                    audioPlayerRef.current.currentTime != videoPlayerRef.current.currentTime &&
+                    (audioPlayerRef.current.currentTime < videoPlayerRef.current.currentTime - 0.25 || audioPlayerRef.current.currentTime > videoPlayerRef.current.currentTime + 0.25)) {
+                    audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+                    console.log("video and audio out of sync, syncing");
+                }
+            }, 1000);
         }
     }, [hub]);
 

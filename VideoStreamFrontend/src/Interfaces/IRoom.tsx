@@ -12,5 +12,6 @@ export interface IRoom {
     Name: string;
     Queue: Array<IQueue>;
     StreamUrls: Array<StreamUrl>;
-    Status: VideoStatus
+    Status: VideoStatus;
+    CurrentTime: number;
 }
