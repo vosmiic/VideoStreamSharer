@@ -49,12 +49,16 @@ public class RoomController : Controller {
         
         var connections = await _redis.HashGetAllAsync(RedisKeys.RoomConnectionsKey(roomId));
 
+        var redisCurrentTime = _redis.HashGet(roomId.ToString(), RedisKeys.RoomCurrentTimeField());
+        double currentTime = redisCurrentTime != RedisValue.Null && redisCurrentTime.TryParse(out double time) ? time : room.CurrentTime;
+        
         return Ok(new GetRoomResponse {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
                 StreamUrls = await RoomHelper.GetStreamUrls(_redis, room),
                 Status = room.Status,
+                CurrentTime = currentTime,
                 Queue = room.Queue.Select(q => new QueueItemApiModel {
                     Id = q.Id,
                     Title = q.Title,

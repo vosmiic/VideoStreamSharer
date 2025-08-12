@@ -25,6 +25,7 @@ public class PrimaryHub : Hub {
     private readonly string LoadVideoMethod = "LoadVideo";
     private readonly string PauseVideoMethod = "PauseVideo";
     private readonly string PlayVideoMethod = "PlayVideo";
+    private readonly string TimeUpdateMethod = "TimeUpdate";
 
     #endregion
 
@@ -88,6 +89,23 @@ public class PrimaryHub : Hub {
         }
 
         await SendToAllRoomClients(roomId, StatusChangeMethod, status);
+    }
+
+    [AllowAnonymous]
+    public async Task UpdateRoomTime(double time) {
+        string? roomId = Context.GetHttpContext().Request.Query["roomId"];
+        if (roomId == null) return;
+        if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
+        await SendToAllRoomClients(parsedRoomId, TimeUpdateMethod, time);
+        var counter = _redis.HashIncrement(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        _redis.HashSet(roomId, RedisKeys.RoomCurrentTimeField(), time);
+        if (counter >= 5) {
+            Room? room = await _roomService.GetRoomById(parsedRoomId);
+            if (room == null) return;
+            room.CurrentTime = time;
+            await _roomService.SaveChanges();
+            _redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        }
     }
 
     [AllowAnonymous]
