@@ -5,6 +5,7 @@ public class Room : GuidPrimaryKey {
     public string Name { get; set; }
     public virtual ICollection<QueueItem> Queue { get; set; } = new List<QueueItem>();
     public Status Status { get; set; }
+    public double CurrentTime { get; set; }
 }
 
 public enum Status {
