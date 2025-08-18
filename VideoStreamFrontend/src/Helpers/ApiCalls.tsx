@@ -29,5 +29,15 @@ export async function ChangeQueueOrder(roomId : string, request : [QueueOrder]) 
             "Content-Type": "application/json"
         },
         body: JSON.stringify(request)
-    })
+    });
+}
+
+export async function GetStream(userId: string) {
+    return await fetch(`${constants.API_URL}/stream/${userId}`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include"
+    });
 }
