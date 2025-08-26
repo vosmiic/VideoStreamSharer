@@ -34,7 +34,6 @@ interface ErrorResponse {
 
 /** WebRTC/WHEP reader. */
 class MediaMTXWebRTCReader {
-    private retryPause: number = 2000;
     private conf: Conf;
     private state: ReaderState = 'getting_codecs';
     private restartTimeout: number | null = null;
@@ -343,15 +342,7 @@ class MediaMTXWebRTCReader {
                 this.sessionUrl = null;
             }
             this.queuedCandidates = [];
-            this.state = 'restarting';
-            this.restartTimeout = window.setTimeout(() => {
-                this.restartTimeout = null;
-                this.state = 'running';
-                this.#start();
-            }, this.retryPause);
-            if (this.conf.onError !== undefined) {
-                this.conf.onError(`${err}, retrying in some seconds`);
-            }
+            this.state = 'failed';
         } else if (this.state === 'getting_codecs') {
             this.state = 'failed';
             if (this.conf.onError !== undefined) {
@@ -374,14 +365,14 @@ class MediaMTXWebRTCReader {
                 }
                 this.nonAdvertisedCodecs = codecs;
                 this.state = 'running';
-                this.#start();
+                this.Start();
             })
             .catch((err) => {
                 this.#handleError(err);
             });
     }
 
-    #start(): void {
+    Start(): void {
         this.#requestICEServers()
             .then((iceServers) => this.#setupPeerConnection(iceServers))
             .then((offer) => this.#sendOffer(offer))
