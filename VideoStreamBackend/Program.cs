@@ -60,5 +60,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapHub<PrimaryHub>("/hub");
+app.MapHub<StreamHub>("/streamHub");
 
 app.Run();
