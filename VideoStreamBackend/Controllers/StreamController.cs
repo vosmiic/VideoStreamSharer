@@ -32,6 +32,7 @@ public class StreamController : Controller {
         return Ok(new Stream {
             InputUrl = streamInputUrl.Replace("{user}", user.Id),
             OutputUrl = streamOutputUrl.Replace("{user}", user.Id),
+            Name = user.UserName,
         });
     }
 
