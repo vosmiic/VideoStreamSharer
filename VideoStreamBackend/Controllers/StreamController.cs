@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -20,20 +20,24 @@ public class StreamController : Controller {
         this.streamHubContext = streamHubContext;
     }
     
-    [Authorize]
     [Route("stream/{userId}")]
     public async Task<IActionResult> Index(Guid userId) {
         IdentityUser? user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null) return new NotFoundResult();
-        var streamInputUrl = _configuration["Stream:InputUrl"];
+        Stream stream = new Stream {
+            Name = user.UserName
+        };
+        if (User.Identity?.IsAuthenticated == true && User.FindFirstValue(ClaimTypes.NameIdentifier) == userId.ToString()) {
+            var streamInputUrl = _configuration["Stream:InputUrl"];
+            if (streamInputUrl == null) return new BadRequestObjectResult("Stream input url not found in server settings.");
+            stream.InputUrl = streamInputUrl.Replace("{user}", user.Id);
+        }
+        
         var streamOutputUrl = _configuration["Stream:OutputUrl"];
-        if (streamInputUrl == null || streamOutputUrl == null) return new BadRequestResult();
-
-        return Ok(new Stream {
-            InputUrl = streamInputUrl.Replace("{user}", user.Id),
-            OutputUrl = streamOutputUrl.Replace("{user}", user.Id),
-            Name = user.UserName,
-        });
+        if (streamOutputUrl == null) return new BadRequestObjectResult("Stream output url not found in server settings.");
+        stream.OutputUrl = streamOutputUrl.Replace("{user}", user.Id);
+        
+        return Ok(stream);
     }
 
     [HttpGet]
