@@ -87,6 +87,9 @@ export default function Index() {
                     <div>OFFLINE</div>}
                 <div>{streamData?.Name}</div>
             </div>
+            {streamData?.InputUrl ? <div>
+                Your stream key: {streamData.InputUrl}
+            </div> : <></>}
         </div>
         <div className={"flex-initial w-1/5 bg-amber-600"}>
             chat goes here
