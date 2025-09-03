@@ -83,4 +83,63 @@ public class QueueController : Controller {
         await _queueItemService.SaveChanges();
         return Ok();
     }
+
+    [HttpGet]
+    [Route("lookup")]
+    public async Task<ActionResult> Lookup([FromQuery] string url) {
+        Uri uri = new Uri(url);
+        YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
+        (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
+        if (info.videoInfo == null) return new BadRequestObjectResult($"Error: {info.error ?? "could not retrieve video info"}");
+
+        var model = new LookupModel {
+            Title = info.videoInfo.Title,
+            ChannelTitle = info.videoInfo.Channel.Name,
+            ThumbnailUrl = info.videoInfo.Thumbnail,
+            Viewcount = $"{info.videoInfo.Viewcount:N0}",
+            Duration = new DateTimeOffset().AddSeconds(info.videoInfo.Duration).ToString("t"),
+            AudioFormats = info.videoInfo.Formats
+                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: true })
+                .OrderByDescending(stream => stream.Quality)
+                .ThenByDescending(stream => stream.FilesizeApprox)
+                .DistinctBy(stream => stream.Resolution)
+                .Select(stream => new LookupModel.LookupFormats {
+                    Id = stream.FormatId,
+                    Value = stream.Quality.ToString("F1"),
+                }).OrderByDescending(format => format.Id),
+            VideoFormats = info.videoInfo.Formats
+                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: false })
+                .OrderByDescending(stream => stream.Quality)
+                .ThenByDescending(stream => stream.FilesizeApprox)
+                .DistinctBy(stream => stream.Resolution)
+                .Select(stream => new LookupModel.LookupFormats {
+                    Id = stream.FormatId,
+                    Value = stream.Resolution,
+                }).OrderByDescending(format => format.Id)
+        };
+
+        return Ok(model);
+    }
+
+    private static async Task<(VideoInfo? videoInfo, string? error)> RetrieveVideoInfoWithRetries(YtDlpHelper ytDlpHelper, Uri uri) {
+        VideoInfo? info = null;
+        int counter = 0;
+        while (counter < 3) {
+            StringBuilder standardOutput = new StringBuilder();
+            StringBuilder errorOutput = new StringBuilder();
+            (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
+            if (!videoInfo.success || videoInfo.videoInfo == null) return (null, videoInfo.error);
+
+            if (videoInfo.videoInfo.Formats.All(format => format.IsAudio && format.Protocol != VideoInfo.Protocol.https) ||
+                videoInfo.videoInfo.Formats.All(format => !format.IsAudio && format.Protocol != VideoInfo.Protocol.https)) {
+                // retry the request, sometimes the server provides odd results
+                counter++;
+            } else {
+                info = videoInfo.videoInfo;
+                break;
+            }
+        }
+
+        return (info, null);
+    }
 }
