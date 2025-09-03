@@ -92,14 +92,17 @@ public class PrimaryHub : Hub {
     }
 
     [AllowAnonymous]
-    public async Task UpdateRoomTime(double time) {
+    public async Task UpdateRoomTime(double time, bool skipCounter) {
         string? roomId = Context.GetHttpContext().Request.Query["roomId"];
         if (roomId == null) return;
         if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
         await SendToAllRoomClients(parsedRoomId, TimeUpdateMethod, time);
-        var counter = _redis.HashIncrement(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        long counter = 0;
+        if (!skipCounter) {
+            counter = _redis.HashIncrement(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        }
         _redis.HashSet(roomId, RedisKeys.RoomCurrentTimeField(), time);
-        if (counter >= 5) {
+        if (counter >= 5 || skipCounter) {
             Room? room = await _roomService.GetRoomById(parsedRoomId);
             if (room == null) return;
             room.CurrentTime = time;

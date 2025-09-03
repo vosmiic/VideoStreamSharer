@@ -23,7 +23,7 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
 
         setInterval(() => {
             if (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
-                hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime);
+                updateRoomTime(false);
             }
         }, 1000);
 
@@ -32,6 +32,10 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
             audioPlayerRef.current.currentTime = params.startTime;
         }
     });
+
+    function updateRoomTime(skipCounter : boolean) {
+        hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
+    }
 
     useEffect(() => {
         syncControl();
@@ -98,6 +102,8 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
                     audioPlayerRef.current.volume = 0;
                     audioPlayerRef.current.play();
                 });
+                // forcibly update room time
+                updateRoomTime(true);
             });
 
             videoPlayerRef.current.addEventListener("ratechange", () => {
