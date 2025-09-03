@@ -35,7 +35,12 @@ export default function QueueAdd() {
     }
 
     async function handleOnSubmit() {
-        await AddToQueue(new QueueAddBody(roomId, input))
+        const queueAdd: IQueueAdd = {
+            Url: input,
+            VideoFormatId: videoFormatId,
+            AudioFormatId: audioFormatId
+        }
+        await AddToQueue(roomId, queueAdd)
             .then((result) => {
                 if (result.ok) {
                     // todo alert user of success using toast

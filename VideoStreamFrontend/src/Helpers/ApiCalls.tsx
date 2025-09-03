@@ -1,6 +1,7 @@
 import * as constants from "../Constants/constants.tsx";
 import QueueAddBody from "../Models/QueueAdd.tsx";
 import QueueOrder from "../Models/QueueOrder.tsx";
+import {IQueueAdd} from "../Interfaces/IQueueAdd.tsx";
 
 
 export async function GetRoom(roomId) {
@@ -12,13 +13,13 @@ export async function GetRoom(roomId) {
     })
 }
 
-export async function AddToQueue(request : QueueAddBody) {
-    return await fetch(`${constants.API_URL}/queue/${request.RoomId}/add`, {
+export async function AddToQueue(roomId : string, input : IQueueAdd) {
+    return await fetch(`${constants.API_URL}/queue/${roomId}/add`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: '"' + request.Url + '"'
+        body: JSON.stringify(input)
     });
 }
 
