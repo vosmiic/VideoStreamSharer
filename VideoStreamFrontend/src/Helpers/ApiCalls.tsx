@@ -41,3 +41,12 @@ export async function GetStream(userId: string) {
         credentials: "include"
     });
 }
+
+export async function Lookup(url : string) {
+    return await fetch(`${constants.API_URL}/queue/lookup?url=${url}`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    });
+}
