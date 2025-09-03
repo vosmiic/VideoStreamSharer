@@ -26,19 +26,25 @@ public class QueueController : Controller {
 
     [HttpPost]
     [Route("{roomId}/add")]
-    public async Task<ActionResult> AddToQueue([FromRoute] Guid roomId, [FromBody] string url) {
+    public async Task<ActionResult> AddToQueue([FromRoute] Guid roomId, [FromBody] QueueAdd data) {
         var room = await _roomService.GetRoomById(roomId);
         if (room == null) return new NotFoundResult();
-        
-        Uri uri = new Uri(url);
+
+        Uri uri = new Uri(data.Url);
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-        StringBuilder standardOutput = new StringBuilder();
-        StringBuilder errorOutput = new StringBuilder();
-        (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
-        if (!videoInfo.success || videoInfo.videoInfo == null) return new BadRequestObjectResult($"Error: {videoInfo.error}");
+        (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
+        if (info.videoInfo == null) return new BadRequestObjectResult($"Error: {info.error ?? "could not retrieve video info."}");
+        
+        // confirm IDs exist
+        var videoFormat = info.videoInfo.Formats.FirstOrDefault(format => !format.IsAudio && format.FormatId == data.VideoFormatId);
+        var audioFormat = info.videoInfo.Formats.FirstOrDefault(format => format.IsAudio && format.FormatId == data.AudioFormatId);
+        if (videoFormat == null || audioFormat == null) return new BadRequestObjectResult($"Error: format could not be found.");
+        
         room.Queue.Add(new YouTubeVideo {
-            Title = videoInfo.videoInfo.Title,
-            VideoUrl = uri
+            Title = info.videoInfo.Title,
+            VideoUrl = uri,
+            VideoFormatId = data.VideoFormatId,
+            AudioFormatId = data.AudioFormatId,
         });
         await _roomService.SaveChanges();
         /* Old youtube solution
@@ -50,9 +56,9 @@ public class QueueController : Controller {
             GroupCollection groupCollection = match.Groups;
             videoId = groupCollection[1].Value;
         }
-        
+
         if (videoId == null) return new BadRequestResult();
-        
+
         room.Queue.Add(new YouTubeVideo {
             Title = "YouTube Video", //todo get title from youtube metadata endpoint
             VideoId = videoId
@@ -74,12 +80,11 @@ public class QueueController : Controller {
                 originalQueue.Order = queueOrderResponse.Order;
             }
         }
-        
-        if (room.Queue.Any(queue => room.Queue.Count(item => item.Order == queue.Order) > 1))
-        {
+
+        if (room.Queue.Any(queue => room.Queue.Count(item => item.Order == queue.Order) > 1)) {
             return BadRequest("Duplicate order");
         }
-        
+
         await _queueItemService.SaveChanges();
         return Ok();
     }

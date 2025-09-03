@@ -124,9 +124,7 @@ public class PrimaryHub : Hub {
         await _queueItemService.Remove(latestQueueItem);
         QueueItem? nextQueueItem = room.CurrentVideo(); // get next video
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-        StringBuilder standardOutput = new StringBuilder();
-        StringBuilder errorOutput = new StringBuilder();
-        var result = await ytDlpHelper.GetVideoUrls(nextQueueItem is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl : null, standardOutput, errorOutput);
+        var result = await ytDlpHelper.GetVideoUrls(nextQueueItem);
         if (!result.success) return;
         await SendToAllRoomClients(roomId, LoadVideoMethod, result.urls);
         _redis.HashSet(RedisKeys.RoomKey(roomId), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(result.urls));

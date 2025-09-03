@@ -23,6 +23,7 @@ public class RoomHelper {
         RedisValue? audioUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentAudioField());
         
         List<StreamUrl> streamUrls = new List<StreamUrl>();
+        QueueItem? queueItem = room.CurrentVideo();
         if (videoUrlFromRedis is { HasValue: true } || audioUrlFromRedis is { HasValue: true }) {
             // retrieve the urls
             if (videoUrlFromRedis.HasValue) {
@@ -32,12 +33,10 @@ public class RoomHelper {
             if (audioUrlFromRedis.HasValue) {
                 streamUrls.Add(JsonSerializer.Deserialize<StreamUrl>(audioUrlFromRedis.Value.ToString()));
             }
-        } else {
+        } else if (queueItem != null) {
             // store the video in redis for others
             YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-            StringBuilder standardOutput = new StringBuilder();
-            StringBuilder errorOutput = new StringBuilder();
-            var result = await ytDlpHelper.GetVideoUrls(room.CurrentVideo() is YouTubeVideo youTubeVideo ? youTubeVideo.VideoUrl : null, standardOutput, errorOutput);
+            var result = await ytDlpHelper.GetVideoUrls(queueItem);
             if (!result.success || result.urls == null) {
                 return streamUrls;
             }
