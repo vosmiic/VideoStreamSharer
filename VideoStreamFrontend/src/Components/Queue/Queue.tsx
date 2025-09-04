@@ -14,7 +14,7 @@ import {RoomContext} from "../../Contexts/RoomContext.tsx";
 
 export default function Queue({queueItems}) {
     const roomId = useContext(RoomContext);
-    const [items, setItems] = useState(queueItems);
+    const [items, setItems] = useState<IQueue[]>(queueItems);
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -67,7 +67,7 @@ export default function Queue({queueItems}) {
             onDragEnd={handleDragEnd}>
             <div className={"grid grid-cols-1 gap-4"}>
                 <SortableContext items={items} strategy={verticalListSortingStrategy}>
-                    {items.sort(sortQueueItems).map(item => <QueueItem key={item.Id} id={item.Id} title={item.Title} />)}
+                    {items.sort(sortQueueItems).map(item => <QueueItem key={item.Id} queueItem={item} />)}
                 </SortableContext>
             </div>
         </DndContext>

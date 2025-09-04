@@ -76,15 +76,14 @@ export default function RoomBody(params: {roomId: string}) {
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
-            <p>Loaded {getRoom.Room.Name}</p>
             <div className={"flex w-full"}>
-                <div className={"flex-auto w-20 bg-red-500"}>
+                <div className={"flex-auto w-1/6 bg-red-500"}>
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
-                <div className={"flex-auto w-60 bg-yellow-500"}>
+                <div className={"flex-auto w-4/6 bg-yellow-500"}>
                     <FilePlayer streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing} startTime={getRoom?.Room.CurrentTime}/>
                 </div>
-                <div className={"flex-auto w-20 bg-blue-500"}>
+                <div className={"flex-auto w-1/6 bg-blue-500"}>
                     <Users users={getRoom.Users}/>
                 </div>
             </div>

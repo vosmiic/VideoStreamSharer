@@ -45,6 +45,7 @@ public class QueueController : Controller {
             VideoUrl = uri,
             VideoFormatId = data.VideoFormatId,
             AudioFormatId = data.AudioFormatId,
+            ThumbnailLocation = info.videoInfo.Thumbnail
         });
         await _roomService.SaveChanges();
         /* Old youtube solution
