@@ -3,7 +3,7 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 
-export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autoplay : boolean, startTime : number}) {
+export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autoplay: boolean, startTime: number }) {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>(null);
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
@@ -31,16 +31,21 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
             videoPlayerRef.current.currentTime = params.startTime;
             audioPlayerRef.current.currentTime = params.startTime;
         }
+
+        audioPlayerRef.current.addEventListener("play", () => {
+            if (videoPlayerRef.current.currentTime == 0 || videoPlayerRef.current.paused || videoPlayerRef.current.ended || videoPlayerRef.current.readyState <= 2)
+                audioPlayerRef.current.pause();
+        });
     });
 
-    function updateRoomTime(skipCounter : boolean) {
+    function updateRoomTime(skipCounter: boolean) {
         hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
     }
 
     useEffect(() => {
         syncControl();
 
-        hub.on("LoadVideo", (urlsOfNextVideo : StreamUrl[] | null) => {
+        hub.on("LoadVideo", (urlsOfNextVideo: StreamUrl[] | null) => {
             if (urlsOfNextVideo != null) {
                 setUrls(urlsOfNextVideo);
             }
@@ -66,7 +71,7 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
             }
         });
 
-        hub.on("TimeUpdate", (time : number) => {
+        hub.on("TimeUpdate", (time: number) => {
             if (videoPlayerRef.current.currentTime < time - 1 || videoPlayerRef.current.currentTime > time + 1) {
                 videoPlayerRef.current.currentTime = time;
                 audioPlayerRef.current.currentTime = time;
@@ -139,12 +144,12 @@ export default function FilePlayer(params: {streamUrls : Array<StreamUrl>, autop
     return (
         <div id="player">
             <video ref={videoPlayerRef} controls={true} preload={"auto"}>
-                <source src={urls.find(url => url.StreamType === StreamType.Video)?.Url} />
+                <source src={urls.find(url => url.StreamType === StreamType.Video)?.Url}/>
             </video>
             <audio ref={audioPlayerRef} preload={"auto"}>
-                <source src={urls.find(url => url.StreamType === StreamType.Audio)?.Url} />
+                <source src={urls.find(url => url.StreamType === StreamType.Audio)?.Url}/>
             </audio>
-            <input type={"range"} onChange={changeVolume} />
+            <input type={"range"} onChange={changeVolume}/>
         </div>
     )
 }
