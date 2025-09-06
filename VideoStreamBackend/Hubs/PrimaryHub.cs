@@ -38,6 +38,7 @@ public class PrimaryHub : Hub {
     
     public override async Task OnDisconnectedAsync(Exception? exception) {
         var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomId.ToString());
         string roomConnectionKey = RedisKeys.RoomConnectionsKey(roomId);
         string? username = _redis.HashGet(roomConnectionKey, Context.ConnectionId);
         _redis.HashDelete(roomConnectionKey, Context.ConnectionId);
@@ -63,6 +64,8 @@ public class PrimaryHub : Hub {
             username = Guid.NewGuid().ToString().Replace("-", "");
         }
         var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
+        
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomId.ToString());
 
         string roomConnectionKey = RedisKeys.RoomConnectionsKey(roomId);
         _redis.HashSet(roomConnectionKey, Context.ConnectionId, username);
