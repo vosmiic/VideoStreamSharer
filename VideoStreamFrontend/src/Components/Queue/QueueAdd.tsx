@@ -10,6 +10,7 @@ export default function QueueAdd() {
     const [input, setInput] = useState<string>("");
     const [lookup, setLookup] = useState<ILookup>();
     const [loading, setLoading] = useState<boolean>(true);
+    const [addingVideo, setAddingVideo] = useState<boolean>(false);
     const [displayPreview, setDisplayPreview] = useState<boolean>(false);
     const [videoFormatId, setVideoFormatId] = useState<string>();
     const [audioFormatId, setAudioFormatId] = useState<string>();
@@ -40,10 +41,12 @@ export default function QueueAdd() {
             VideoFormatId: videoFormatId,
             AudioFormatId: audioFormatId
         }
+        setAddingVideo(true);
         await AddToQueue(roomId, queueAdd)
             .then((result) => {
                 if (result.ok) {
-                    // todo alert user of success using toast
+                    setAddingVideo(false);
+                    modal.current.close();
                 } else {
                     // todo alert user of failure using toast
                 }
@@ -100,7 +103,7 @@ export default function QueueAdd() {
                                 </select>
                             </div>
                             <div className={""}>
-                                <button onClick={handleOnSubmit}>Submit</button>
+                                <button onClick={handleOnSubmit}>Submit{addingVideo ? <span className={"loading loading-spinner loading-xs"}></span> : <></>}</button>
                             </div>
                         </div>
                     : <></>}
