@@ -1,5 +1,5 @@
 import {closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors} from "@dnd-kit/core";
-import {useContext, useState} from "react";
+import {useContext, useEffect, useState} from "react";
 import {
     arrayMove,
     SortableContext,
@@ -11,9 +11,11 @@ import QueueAdd from "./QueueAdd.tsx";
 import {IQueue} from "../../Interfaces/IQueue.tsx";
 import {ChangeQueueOrder} from "../../Helpers/ApiCalls.tsx";
 import {RoomContext} from "../../Contexts/RoomContext.tsx";
+import {HubContext} from "../../Contexts/HubContext.tsx";
 
 export default function Queue({queueItems}) {
     const roomId = useContext(RoomContext);
+    const hub = useContext(HubContext);
     const [items, setItems] = useState<IQueue[]>(queueItems);
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -57,6 +59,20 @@ export default function Queue({queueItems}) {
             return 0;
         }
     }
+
+    useEffect(() => {
+        hub.on("QueueAdded", (queueItem) => {
+            console.log(queueItem);
+            const item : IQueue = {
+                Title : queueItem.title,
+                ThumbnailLocation : queueItem.thumbnailLocation,
+                Order : queueItem.order,
+                Id : queueItem.id,
+                Type : queueItem.type
+            };
+            setItems([...items, item]);
+        })
+    }, [hub, items])
 
     return (
         <div>

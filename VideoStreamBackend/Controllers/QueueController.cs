@@ -1,9 +1,8 @@
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.AspNetCore.SignalR;
 using VideoStreamBackend.Helpers;
+using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
@@ -18,10 +17,12 @@ namespace VideoStreamBackend.Controllers;
 public class QueueController : Controller {
     private readonly IRoomService _roomService;
     private readonly IQueueItemService _queueItemService;
+    private IHubContext<PrimaryHub> _primaryHubContext { get; set; }
 
-    public QueueController(IRoomService roomService, IQueueItemService queueItemService) {
+    public QueueController(IRoomService roomService, IQueueItemService queueItemService, IHubContext<PrimaryHub> primaryHubContext) {
         _roomService = roomService;
         _queueItemService = queueItemService;
+        _primaryHubContext = primaryHubContext;
     }
 
     [HttpPost]
@@ -39,15 +40,18 @@ public class QueueController : Controller {
         var videoFormat = info.videoInfo.Formats.FirstOrDefault(format => !format.IsAudio && format.FormatId == data.VideoFormatId);
         var audioFormat = info.videoInfo.Formats.FirstOrDefault(format => format.IsAudio && format.FormatId == data.AudioFormatId);
         if (videoFormat == null || audioFormat == null) return new BadRequestObjectResult($"Error: format could not be found.");
-        
-        room.Queue.Add(new YouTubeVideo {
+
+        var video = new YouTubeVideo {
             Title = info.videoInfo.Title,
             VideoUrl = uri,
             VideoFormatId = data.VideoFormatId,
             AudioFormatId = data.AudioFormatId,
-            ThumbnailLocation = info.videoInfo.Thumbnail
-        });
+            ThumbnailLocation = info.videoInfo.Thumbnail,
+            Order = room.Queue.Count > 1 ? room.Queue.Max(queue => queue.Order) + 1 : 0,
+        };
+        room.Queue.Add(video);
         await _roomService.SaveChanges();
+        await _primaryHubContext.Clients.Group(roomId.ToString()).SendAsync(PrimaryHub.QueueAdded, video);
         /* Old youtube solution
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
 

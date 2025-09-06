@@ -26,6 +26,7 @@ public class PrimaryHub : Hub {
     private readonly string PauseVideoMethod = "PauseVideo";
     private readonly string PlayVideoMethod = "PlayVideo";
     private readonly string TimeUpdateMethod = "TimeUpdate";
+    public static readonly string QueueAdded = "QueueAdded";
 
     #endregion
 
