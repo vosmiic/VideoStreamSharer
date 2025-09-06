@@ -92,7 +92,7 @@ public class PrimaryHub : Hub {
             return;
         }
 
-        await SendToAllRoomClients(roomId, StatusChangeMethod, status);
+        await Clients.Group(roomId.ToString()).SendAsync(StatusChangeMethod, status);
     }
 
     [AllowAnonymous]
@@ -100,7 +100,7 @@ public class PrimaryHub : Hub {
         string? roomId = Context.GetHttpContext().Request.Query["roomId"];
         if (roomId == null) return;
         if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
-        await SendToAllRoomClients(parsedRoomId, TimeUpdateMethod, time);
+        await Clients.Group(roomId).SendAsync(TimeUpdateMethod, time);
         long counter = 0;
         if (!skipCounter) {
             counter = _redis.HashIncrement(roomId, RedisKeys.RoomUpdateTimeCounterField());
@@ -133,18 +133,10 @@ public class PrimaryHub : Hub {
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
         var result = await ytDlpHelper.GetVideoUrls(nextQueueItem);
         if (!result.success) return;
-        await SendToAllRoomClients(roomId, LoadVideoMethod, result.urls);
+        await Clients.Group(roomId.ToString()).SendAsync(LoadVideoMethod, result.urls);
         _redis.HashSet(RedisKeys.RoomKey(roomId), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(result.urls));
     }
 
-    private async Task SendToAllRoomClients(Guid roomId, string method, object? data) {
-        string roomConnectionKey = RedisKeys.RoomConnectionsKey(roomId);
-        HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
-        foreach (HashEntry connection in connections) {
-            await Clients.Client(connection.Name).SendAsync(method, data);
-        }
-    }
-    
     private async Task StatusUpdate(Status status) {
         var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
         Room? room = await _roomService.GetRoomById(roomId);
@@ -163,6 +155,6 @@ public class PrimaryHub : Hub {
                 break;
         }
         if (method != null)
-            await SendToAllRoomClients(roomId, method, null);
+            await Clients.Group(roomId.ToString()).SendAsync(method);
     }
 }
