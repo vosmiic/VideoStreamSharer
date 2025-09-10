@@ -38,13 +38,24 @@ public class PrimaryHub : Hub {
     }
     
     public override async Task OnDisconnectedAsync(Exception? exception) {
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        await Groups.AddToGroupAsync(Context.ConnectionId, roomId.ToString());
-        string roomConnectionKey = RedisKeys.RoomConnectionsKey(roomId);
+        var roomId = Context.GetHttpContext()?.Request.Query["roomId"].ToString();
+        if (string.IsNullOrEmpty(roomId)) return;
+        var parsedRoomId = Guid.Parse(roomId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, parsedRoomId.ToString());
+        string roomConnectionKey = RedisKeys.RoomConnectionsKey(parsedRoomId);
         string? username = _redis.HashGet(roomConnectionKey, Context.ConnectionId);
         _redis.HashDelete(roomConnectionKey, Context.ConnectionId);
+        RedisValue currentLeader = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+        HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
+        if (currentLeader != RedisValue.Null && currentLeader == Context.ConnectionId) {
+            // remove leader
+            _redis.HashDelete(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+            // and assign a new leader
+            var firstUser = connections.FirstOrDefault().Name;
+            if (firstUser != RedisValue.Null)
+                _redis.HashSet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField(), firstUser);
+        }
         if (username != null) {
-            HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
             foreach (HashEntry connection in connections) {
                 await Clients.Client(connection.Name).SendAsync("RemoveUser", username);
             }
@@ -64,12 +75,20 @@ public class PrimaryHub : Hub {
             // todo generate real random usernames
             username = Guid.NewGuid().ToString().Replace("-", "");
         }
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        
-        await Groups.AddToGroupAsync(Context.ConnectionId, roomId.ToString());
 
-        string roomConnectionKey = RedisKeys.RoomConnectionsKey(roomId);
+        string? roomId = Context.GetHttpContext()?.Request.Query["roomId"].ToString();
+        if (string.IsNullOrEmpty(roomId)) return;
+        Guid parsedRoomId = Guid.Parse(roomId);
+        
+        await Groups.AddToGroupAsync(Context.ConnectionId, parsedRoomId.ToString());
+
+        string roomConnectionKey = RedisKeys.RoomConnectionsKey(parsedRoomId);
         _redis.HashSet(roomConnectionKey, Context.ConnectionId, username);
+        RedisValue currentLeader = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+        if (currentLeader == RedisValue.Null || !_redis.HashExists(roomConnectionKey, currentLeader)) {
+            // no leader so set the current user to be the leader
+            _redis.HashSet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField(), Context.ConnectionId);
+        }
 
         HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
         foreach (HashEntry connection in connections) {
