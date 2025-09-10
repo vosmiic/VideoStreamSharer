@@ -118,6 +118,11 @@ public class PrimaryHub : Hub {
     public async Task UpdateRoomTime(double time, bool skipCounter) {
         string? roomId = Context.GetHttpContext().Request.Query["roomId"];
         if (roomId == null) return;
+        if (!skipCounter) {
+            RedisValue leaderConnectionId = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+            if (leaderConnectionId == RedisValue.Null || Context.ConnectionId != leaderConnectionId)
+                return;
+        }
         if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
         await Clients.Group(roomId).SendAsync(TimeUpdateMethod, time);
         long counter = 0;
