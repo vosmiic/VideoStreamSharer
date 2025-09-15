@@ -16,7 +16,7 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 export default function Queue({queueItems}) {
     const roomId = useContext(RoomContext);
     const hub = useContext(HubContext);
-    const [items, setItems] = useState<IQueue[]>(queueItems);
+    const [items, setItems] = useState<IQueue[]>(queueItems || []);
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -60,9 +60,16 @@ export default function Queue({queueItems}) {
         }
     }
 
+    // Update internal state when props change
+    useEffect(() => {
+        if (queueItems) {
+            setItems(queueItems);
+        }
+    }, [queueItems]);
+
+
     useEffect(() => {
         hub.on("QueueAdded", (queueItem) => {
-            console.log(queueItem);
             const item : IQueue = {
                 Title : queueItem.title,
                 ThumbnailLocation : queueItem.thumbnailLocation,

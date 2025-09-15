@@ -7,6 +7,7 @@ using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
+using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
@@ -27,6 +28,8 @@ public class PrimaryHub : Hub {
     private readonly string PlayVideoMethod = "PlayVideo";
     private readonly string TimeUpdateMethod = "TimeUpdate";
     public static readonly string QueueAdded = "QueueAdded";
+    private readonly string VideoFinishedMethod = "VideoFinished";
+    private readonly string SetQueueMethod = "SetQueue";
 
     #endregion
 
@@ -116,11 +119,10 @@ public class PrimaryHub : Hub {
 
     [AllowAnonymous]
     public async Task UpdateRoomTime(double time, bool skipCounter) {
-        string? roomId = Context.GetHttpContext().Request.Query["roomId"];
+        string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
         if (roomId == null) return;
         if (!skipCounter) {
-            RedisValue leaderConnectionId = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
-            if (leaderConnectionId == RedisValue.Null || Context.ConnectionId != leaderConnectionId)
+            if (!LeadershipCheck(roomId))
                 return;
         }
         if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
@@ -146,19 +148,31 @@ public class PrimaryHub : Hub {
     public async Task PlayVideo() => await StatusUpdate(Status.Playing);
 
     [AllowAnonymous]
-    public async Task FinishedVideo() {
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        Room? room = await _roomService.GetRoomById(roomId);
+    public async Task FinishedVideo(Guid videoId) {
+        string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
+        if (roomId == null) return;
+        if (!LeadershipCheck(roomId))
+            return;
+        var parsedRoomId = Guid.Parse(roomId);
+        Room? room = await _roomService.GetRoomById(parsedRoomId);
         if (room == null) return;
         QueueItem? latestQueueItem = room.CurrentVideo();
-        if (latestQueueItem == null) return;
+        if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
+        _redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        _redis.HashDelete(roomId, RedisKeys.RoomCurrentTimeField());
         await _queueItemService.Remove(latestQueueItem);
-        QueueItem? nextQueueItem = room.CurrentVideo(); // get next video
-        YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-        var result = await ytDlpHelper.GetVideoUrls(nextQueueItem);
-        if (!result.success) return;
-        await Clients.Group(roomId.ToString()).SendAsync(LoadVideoMethod, result.urls);
-        _redis.HashSet(RedisKeys.RoomKey(roomId), RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(result.urls));
+        room.CurrentTime = 0;
+        await _roomService.SaveChanges();
+        _redis.HashDelete(roomId, RedisKeys.RoomCurrentVideoField());
+        _redis.HashDelete(roomId, RedisKeys.RoomCurrentAudioField());
+        var result = await RoomHelper.GetStreamUrls(_redis, room);
+        if (result == null) return;
+        await Clients.Group(roomId).SendAsync(VideoFinishedMethod, new GetRoomResponse {
+            Room = new RoomApiModel {
+                StreamUrls = result,
+                Queue = RoomHelper.GetQueueModel(room)
+            }
+        });
     }
 
     private async Task StatusUpdate(Status status) {
@@ -180,5 +194,12 @@ public class PrimaryHub : Hub {
         }
         if (method != null)
             await Clients.Group(roomId.ToString()).SendAsync(method);
+    }
+
+    private bool LeadershipCheck(string roomId) {
+        RedisValue leaderConnectionId = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+        if (leaderConnectionId == RedisValue.Null || Context.ConnectionId != leaderConnectionId)
+            return false;
+        return true;
     }
 }

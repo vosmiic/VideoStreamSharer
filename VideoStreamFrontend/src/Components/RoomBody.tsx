@@ -10,11 +10,12 @@ import {HubConnectionState} from "@microsoft/signalr";
 import Users from "./Users.tsx";
 import FilePlayer from "./Players/FilePlayer.tsx";
 import {VideoStatus} from "../Constants/constants.tsx";
+import {IQueue} from "../Interfaces/IQueue.tsx";
+import StreamUrl from "../Models/StreamUrl.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
     const [getRoom, setGetRoom] = useState<GetRoomResponse>();
-    const [render, setRender] = useState(Loading());
     const [loadState, setLoadState] = useState(0);
     /*
     State:
@@ -56,23 +57,51 @@ export default function RoomBody(params: {roomId: string}) {
         }
     }, [params.roomId, hub]);
 
-    useEffect(() => {
-        switch (loadState) {
-            case 0:
-                setRender(Loading());
-                break;
-            case 1:
-                setRender(NotFound());
-                break;
-            case 2:
-                onLoaded();
-                break;
-        }
-    }, [loadState, getRoom]);
 
-    async function onLoaded() {
-        setRender(LoadedState());
-    }
+    useEffect(() => {
+        const handleVideoFinished = (newRoomData) => {
+            const newItems : IQueue[] = newRoomData.room.queue.map(queueItem => {
+                return {
+                    Title : queueItem.title,
+                    ThumbnailLocation : queueItem.thumbnailLocation,
+                    Order : queueItem.order,
+                    Id : queueItem.id,
+                    Type : queueItem.type
+                } as IQueue
+            });
+            const newUrls : StreamUrl[] = newRoomData.room.streamUrls.map(streamUrl => {
+                return {
+                    Url : streamUrl.url,
+                    StreamType: streamUrl.streamType
+                } as StreamUrl
+            });
+            setGetRoom(previousRoom => {
+                if (!previousRoom) return previousRoom;
+                return {
+                    ...previousRoom,
+                    Room: {
+                        ...previousRoom.Room,
+                        Status: VideoStatus.Playing,
+                        CurrentTime: 0,
+                        Queue: newItems,
+                        StreamUrls: newUrls
+                    }
+                } as GetRoomResponse;
+            });
+        };
+
+        hub.on("VideoFinished", handleVideoFinished);
+
+        // Cleanup function to remove the listener
+        return () => {
+            hub.off("VideoFinished", handleVideoFinished);
+        };
+    }, [hub]); // Remove getRoom from dependencies to avoid stale closures
+
+    useEffect(() => {
+        console.log('getRoom state changed:', getRoom);
+    }, [getRoom]);
+
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
@@ -81,7 +110,7 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={getRoom.Room.Queue} />
                 </div>
                 <div className={"flex-auto w-4/6 bg-yellow-500"}>
-                    <FilePlayer streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing} startTime={getRoom?.Room.CurrentTime}/>
+                    <FilePlayer videoId={getRoom?.Room.Queue.find(queue => queue.Order == 0)?.Id} streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing} startTime={getRoom?.Room.CurrentTime}/>
                 </div>
                 <div className={"flex-auto w-1/6 bg-blue-500"}>
                     <Users users={getRoom.Users}/>
@@ -90,10 +119,24 @@ export default function RoomBody(params: {roomId: string}) {
         </RoomContext.Provider>
     }
 
+    // Render based on load state
+    function renderContent() {
+        switch (loadState) {
+            case 0:
+                return <Loading />;
+            case 1:
+                return <NotFound />;
+            case 2:
+                return LoadedState();
+            default:
+                return <Loading />;
+        }
+    }
+
     return (
         <>
             <h1>Room</h1>
-            {render}
+            {renderContent()}
         </>
     )
 }

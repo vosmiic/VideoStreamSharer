@@ -1,16 +1,17 @@
-import {useContext, useEffect, useRef, useState} from "react";
+import {useContext, useEffect, useRef} from "react";
 import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 
-export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autoplay: boolean, startTime: number }) {
+export default function FilePlayer(params: { videoId: string, streamUrls: Array<StreamUrl>, autoplay: boolean, startTime: number }) {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>(null);
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
-    const [urls, setUrls] = useState(params.streamUrls);
 
     useEffect(() => {
         if (params.autoplay) {
+            videoPlayerRef.current.load();
+            audioPlayerRef.current.load();
             videoPlayerRef.current.play().catch(() => {
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
@@ -22,15 +23,18 @@ export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autop
         }
 
         setInterval(() => {
-            if (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+            if (videoPlayerRef.current && videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
                 updateRoomTime(false);
             }
         }, 1000);
 
-        if (params.startTime > 0) {
+        videoPlayerRef.current.addEventListener("loadedmetadata", () => {
             videoPlayerRef.current.currentTime = params.startTime;
+        });
+
+        audioPlayerRef.current.addEventListener("loadedmetadata", () => {
             audioPlayerRef.current.currentTime = params.startTime;
-        }
+        })
 
         audioPlayerRef.current.addEventListener("play", () => {
             if (videoPlayerRef.current.currentTime == 0 || videoPlayerRef.current.paused || videoPlayerRef.current.ended || videoPlayerRef.current.readyState <= 2)
@@ -47,7 +51,7 @@ export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autop
 
         hub.on("LoadVideo", (urlsOfNextVideo: StreamUrl[] | null) => {
             if (urlsOfNextVideo != null) {
-                setUrls(urlsOfNextVideo);
+                params.streamUrls = urlsOfNextVideo;
             }
         });
 
@@ -122,8 +126,13 @@ export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autop
                 audioPlayerRef.current.pause();
             });
 
+            videoPlayerRef.current.addEventListener("ended", () => {
+                console.log("ended");
+                hub.send("FinishedVideo", params.videoId);
+            })
+
             setInterval(() => {
-                if ((videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
+                if (videoPlayerRef.current && audioPlayerRef.current && (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
                     audioPlayerRef.current.currentTime != videoPlayerRef.current.currentTime &&
                     (audioPlayerRef.current.currentTime < videoPlayerRef.current.currentTime - 0.25 || audioPlayerRef.current.currentTime > videoPlayerRef.current.currentTime + 0.25)) {
                     audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
@@ -141,15 +150,15 @@ export default function FilePlayer(params: { streamUrls: Array<StreamUrl>, autop
     }
 
 
-    return (
+    return params.streamUrls ? (
         <div id="player">
             <video ref={videoPlayerRef} controls={true} preload={"auto"}>
-                <source src={urls.find(url => url.StreamType === StreamType.Video)?.Url}/>
+                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video)?.Url} />
             </video>
             <audio ref={audioPlayerRef} preload={"auto"}>
-                <source src={urls.find(url => url.StreamType === StreamType.Audio)?.Url}/>
+                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url} />
             </audio>
             <input type={"range"} onChange={changeVolume}/>
         </div>
-    )
+    ) : <></>
 }

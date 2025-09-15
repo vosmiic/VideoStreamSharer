@@ -56,16 +56,10 @@ public class RoomController : Controller {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
-                StreamUrls = await RoomHelper.GetStreamUrls(_redis, room),
+                StreamUrls = room.CurrentVideo() != null ? await RoomHelper.GetStreamUrls(_redis, room) : null,
                 Status = room.Status,
                 CurrentTime = currentTime,
-                Queue = room.Queue.Select(q => new QueueItemApiModel {
-                    Id = q.Id,
-                    Title = q.Title,
-                    ThumbnailLocation = q.ThumbnailLocation,
-                    Order = q.Order,
-                    Type = q.GetType().Name
-                })
+                Queue = RoomHelper.GetQueueModel(room)
             },
             Users = connections.Length > 0 ? connections.Select(connection => connection.Value.ToString()) : Array.Empty<string>()
         });

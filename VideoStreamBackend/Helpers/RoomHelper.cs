@@ -4,6 +4,7 @@ using CliWrap;
 using StackExchange.Redis;
 using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
+using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Redis;
@@ -21,7 +22,7 @@ public class RoomHelper {
         string roomId = room.Id.ToString();
         RedisValue? videoUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentVideoField());
         RedisValue? audioUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentAudioField());
-        
+
         List<StreamUrl> streamUrls = new List<StreamUrl>();
         QueueItem? queueItem = room.CurrentVideo();
         if (videoUrlFromRedis is { HasValue: true } || audioUrlFromRedis is { HasValue: true }) {
@@ -52,10 +53,19 @@ public class RoomHelper {
                     await redis.HashFieldExpireAsync(roomId, [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
                 }
             }
-            
+
             streamUrls = result.urls;
         }
 
         return streamUrls;
     }
+
+    public static IEnumerable<QueueItemApiModel> GetQueueModel(Room room) =>
+        room.Queue.Select(q => new QueueItemApiModel {
+            Id = q.Id,
+            Title = q.Title,
+            ThumbnailLocation = q.ThumbnailLocation,
+            Order = q.Order,
+            Type = q.GetType().Name
+        });
 }
