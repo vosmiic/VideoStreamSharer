@@ -25,6 +25,7 @@ public class CliWrapper : ICliWrapper
             .WithArguments(argument)
             .WithStandardOutputPipe(standardOutput)
             .WithStandardErrorPipe(standardError)
+            .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync();
 
         return new CommandResult {

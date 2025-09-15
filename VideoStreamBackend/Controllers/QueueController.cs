@@ -31,7 +31,7 @@ public class QueueController : Controller {
         var room = await _roomService.GetRoomById(roomId);
         if (room == null) return new NotFoundResult();
 
-        Uri uri = new Uri(data.Url);
+        Uri uri = QueueHelper.GetYouTubeUrl(new Uri(data.Url));
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
         (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
         if (info.videoInfo == null) return new BadRequestObjectResult($"Error: {info.error ?? "could not retrieve video info."}");

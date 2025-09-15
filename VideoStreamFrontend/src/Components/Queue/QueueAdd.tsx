@@ -14,11 +14,13 @@ export default function QueueAdd() {
     const [displayPreview, setDisplayPreview] = useState<boolean>(false);
     const [videoFormatId, setVideoFormatId] = useState<string>();
     const [audioFormatId, setAudioFormatId] = useState<string>();
+    const [error, setError] = useState<string | null>();
     const modal = useRef<HTMLDialogElement>(null);
 
     async function handleOnLookup() {
         setDisplayPreview(true);
         setLoading(true);
+        setError(null);
         await Lookup(input)
             .then((result) => {
                 if (result.ok) {
@@ -30,6 +32,10 @@ export default function QueueAdd() {
                     })
                     // todo alert user of success using toast
                 } else {
+                    result.text().then((text : string) => {
+                        setLoading(false);
+                        setError(text);
+                    });
                     // todo alert user of failure using toast
                 }
             })
@@ -42,6 +48,7 @@ export default function QueueAdd() {
             AudioFormatId: audioFormatId
         }
         setAddingVideo(true);
+        setError(null);
         await AddToQueue(roomId, queueAdd)
             .then((result) => {
                 if (result.ok) {
@@ -107,6 +114,9 @@ export default function QueueAdd() {
                             </div>
                         </div>
                     : <></>}
+                <div>
+                    {error ? <p className={"text-red-800"}>{error}</p> : <></>}
+                </div>
                 <div className={"modal-action"}>
                     <form method="dialog">
                         {/* if there is a button in form, it will close the modal */}
