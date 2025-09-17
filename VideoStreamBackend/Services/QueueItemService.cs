@@ -13,6 +13,8 @@ public class QueueItemService (ApplicationDbContext context) : IQueueItemService
         _queueItems.UpdateRange(queueItems);
     }
 
+    public Task<QueueItem?> GetQueueItemById(Guid id) => _queueItems.FirstOrDefaultAsync(queueItem => queueItem.Id == id);
+
     public async Task Remove(QueueItem queueItem) {
         _queueItems.Remove(queueItem);
         await context.SaveChangesAsync();

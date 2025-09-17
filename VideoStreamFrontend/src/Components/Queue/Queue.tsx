@@ -79,6 +79,11 @@ export default function Queue({queueItems}) {
             };
             setItems([...items, item]);
         })
+
+        hub.on("DeleteQueue", (id : string) => {
+            const newQueue = items.filter(item => item.Id != id);
+            setItems(newQueue);
+        })
     }, [hub, items])
 
     return (

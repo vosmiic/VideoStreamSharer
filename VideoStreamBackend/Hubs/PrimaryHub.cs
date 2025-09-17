@@ -1,14 +1,10 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
-using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
-using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
 
@@ -30,6 +26,7 @@ public class PrimaryHub : Hub {
     public static readonly string QueueAdded = "QueueAdded";
     private readonly string VideoFinishedMethod = "VideoFinished";
     private readonly string SetQueueMethod = "SetQueue";
+    private readonly string DeleteQueueMethod = "DeleteQueue";
 
     #endregion
 
@@ -173,6 +170,24 @@ public class PrimaryHub : Hub {
                 Queue = RoomHelper.GetQueueModel(room)
             }
         });
+    }
+
+    public async Task DeleteVideo(Guid videoId) {
+        string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
+        if (roomId == null) return;
+        var parsedRoomId = Guid.Parse(roomId);
+        Room? room = await _roomService.GetRoomById(parsedRoomId);
+        if (room == null) return;
+
+        QueueItem? queueItem = await _queueItemService.GetQueueItemById(videoId);
+        if (queueItem == null || queueItem.Room.Id != parsedRoomId) return;
+
+        if (room.CurrentVideo()?.Id ==  videoId) {
+            await FinishedVideo(videoId);
+        } else {
+            await _queueItemService.Remove(queueItem);
+            await Clients.Group(roomId).SendAsync(DeleteQueueMethod, videoId);
+        }
     }
 
     private async Task StatusUpdate(Status status) {
