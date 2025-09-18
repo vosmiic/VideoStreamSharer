@@ -158,6 +158,14 @@ public class PrimaryHub : Hub {
         QueueItem? latestQueueItem = room.CurrentVideo();
         if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
         await _queueItemService.Remove(latestQueueItem);
+        
+        // re-order the queue
+        foreach (QueueItem queueItem in room.Queue) {
+            queueItem.Order--;
+        }
+
+        await _queueItemService.SaveChanges();
+        
         await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, roomId);
         var result = await RoomHelper.GetStreamUrls(_redis, room);
         if (result == null) return;
