@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Interfaces;
@@ -18,11 +19,13 @@ public class QueueController : Controller {
     private readonly IRoomService _roomService;
     private readonly IQueueItemService _queueItemService;
     private IHubContext<PrimaryHub> _primaryHubContext { get; set; }
+    private readonly IDatabase  _redis;
 
-    public QueueController(IRoomService roomService, IQueueItemService queueItemService, IHubContext<PrimaryHub> primaryHubContext) {
+    public QueueController(IRoomService roomService, IQueueItemService queueItemService, IHubContext<PrimaryHub> primaryHubContext, IConnectionMultiplexer connectionMultiplexer) {
         _roomService = roomService;
         _queueItemService = queueItemService;
         _primaryHubContext = primaryHubContext;
+        _redis = connectionMultiplexer.GetDatabase();
     }
 
     [HttpPost]
@@ -78,11 +81,13 @@ public class QueueController : Controller {
     public async Task<ActionResult> ChangeOrderOfQueue([FromRoute] Guid roomId, [FromBody] List<QueueOrderResponse> queue) {
         Room? room = await _roomService.GetRoomById(roomId);
         if (room == null) return new NotFoundResult();
+        bool currentVideoChanged = false;
 
         foreach (QueueOrderResponse queueOrderResponse in queue) {
             QueueItem? originalQueue = room.Queue.FirstOrDefault(q => q.Id == queueOrderResponse.Id);
             if (originalQueue != null && originalQueue.Order != queueOrderResponse.Order) {
                 originalQueue.Order = queueOrderResponse.Order;
+                if (queueOrderResponse.Order == 0) currentVideoChanged = true;
             }
         }
 
@@ -91,6 +96,14 @@ public class QueueController : Controller {
         }
 
         await _queueItemService.SaveChanges();
+        string stringifiedRoomId = roomId.ToString();
+        if (currentVideoChanged) {
+            await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, stringifiedRoomId);
+            List<StreamUrl>? newStreamUrls = await RoomHelper.GetStreamUrls(_redis, room);
+            if (newStreamUrls == null)  return new BadRequestResult();
+            await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.VideoChangedMethod, newStreamUrls);
+        }
+        await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.QueueOrderChangedMethod, room.Queue.Select(queueItem => new {queueItem.Id, queueItem.Order}));
         return Ok();
     }
 

@@ -27,6 +27,8 @@ public class PrimaryHub : Hub {
     private readonly string VideoFinishedMethod = "VideoFinished";
     private readonly string SetQueueMethod = "SetQueue";
     private readonly string DeleteQueueMethod = "DeleteQueue";
+    public static readonly string QueueOrderChangedMethod = "QueueOrderChanged";
+    public static readonly string VideoChangedMethod = "VideoChanged";
 
     #endregion
 
@@ -155,13 +157,8 @@ public class PrimaryHub : Hub {
         if (room == null) return;
         QueueItem? latestQueueItem = room.CurrentVideo();
         if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
-        _redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
-        _redis.HashDelete(roomId, RedisKeys.RoomCurrentTimeField());
         await _queueItemService.Remove(latestQueueItem);
-        room.CurrentTime = 0;
-        await _roomService.SaveChanges();
-        _redis.HashDelete(roomId, RedisKeys.RoomCurrentVideoField());
-        _redis.HashDelete(roomId, RedisKeys.RoomCurrentAudioField());
+        await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, roomId);
         var result = await RoomHelper.GetStreamUrls(_redis, room);
         if (result == null) return;
         await Clients.Group(roomId).SendAsync(VideoFinishedMethod, new GetRoomResponse {

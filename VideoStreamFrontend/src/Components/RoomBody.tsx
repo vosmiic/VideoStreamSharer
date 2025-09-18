@@ -12,6 +12,7 @@ import FilePlayer from "./Players/FilePlayer.tsx";
 import {VideoStatus} from "../Constants/constants.tsx";
 import {IQueue} from "../Interfaces/IQueue.tsx";
 import StreamUrl from "../Models/StreamUrl.tsx";
+import {StreamType} from "../Models/Enums/StreamType.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -58,6 +59,17 @@ export default function RoomBody(params: {roomId: string}) {
     }, [params.roomId, hub]);
 
 
+    const handleCurrentVideoChanged = (streamUrls) => {
+        const newUrls : StreamUrl[] = streamUrls.map(streamUrl => {
+            return {
+                Url : streamUrl.url,
+                StreamType: streamUrl.streamType
+            } as StreamUrl
+        });
+        return newUrls;
+    }
+
+
     useEffect(() => {
         const handleVideoFinished = (newRoomData) => {
             const newItems : IQueue[] = newRoomData.room.queue.map(queueItem => {
@@ -69,12 +81,6 @@ export default function RoomBody(params: {roomId: string}) {
                     Type : queueItem.type
                 } as IQueue
             });
-            const newUrls : StreamUrl[] = newRoomData.room.streamUrls.map(streamUrl => {
-                return {
-                    Url : streamUrl.url,
-                    StreamType: streamUrl.streamType
-                } as StreamUrl
-            });
             setGetRoom(previousRoom => {
                 if (!previousRoom) return previousRoom;
                 return {
@@ -84,7 +90,7 @@ export default function RoomBody(params: {roomId: string}) {
                         Status: VideoStatus.Playing,
                         CurrentTime: 0,
                         Queue: newItems,
-                        StreamUrls: newUrls
+                        StreamUrls: handleCurrentVideoChanged(newRoomData.room.streamUrls)
                     }
                 } as GetRoomResponse;
             });
@@ -99,8 +105,27 @@ export default function RoomBody(params: {roomId: string}) {
     }, [hub]); // Remove getRoom from dependencies to avoid stale closures
 
     useEffect(() => {
-        console.log('getRoom state changed:', getRoom);
-    }, [getRoom]);
+        const handleVideoChanged = (streamUrls : {url : string, streamType : StreamType}[]) => {
+            setGetRoom(previousRoom => {
+                if (!previousRoom) return previousRoom;
+                return {
+                    ...previousRoom,
+                    Room: {
+                        ...previousRoom.Room,
+                        Status: VideoStatus.Playing,
+                        CurrentTime: 0,
+                        StreamUrls: handleCurrentVideoChanged(streamUrls)
+                    }
+                } as GetRoomResponse;
+            });
+        };
+
+        hub.on("VideoChanged", handleVideoChanged)
+
+        return () => {
+            hub.off("VideoChanged", handleVideoChanged)
+        }
+    }, [hub])
 
 
     function LoadedState() {

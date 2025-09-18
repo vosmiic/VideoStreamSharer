@@ -8,6 +8,7 @@ using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Models.PlayableType;
 using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Redis;
+using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Helpers;
 
@@ -58,6 +59,15 @@ public class RoomHelper {
         }
 
         return streamUrls;
+    }
+
+    public static async Task ResetRoomCurrentVideo(IDatabase redis, IRoomService roomService, Room room, string roomId) {
+        redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
+        redis.HashDelete(roomId, RedisKeys.RoomCurrentTimeField());
+        room.CurrentTime = 0;
+        await roomService.SaveChanges();
+        redis.HashDelete(roomId, RedisKeys.RoomCurrentVideoField());
+        redis.HashDelete(roomId, RedisKeys.RoomCurrentAudioField());
     }
 
     public static IEnumerable<QueueItemApiModel> GetQueueModel(Room room) =>

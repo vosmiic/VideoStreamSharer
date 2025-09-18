@@ -78,10 +78,21 @@ export default function Queue({queueItems}) {
                 Type : queueItem.type
             };
             setItems([...items, item]);
-        })
+        });
 
         hub.on("DeleteQueue", (id : string) => {
             const newQueue = items.filter(item => item.Id != id);
+            setItems(newQueue);
+        });
+
+        hub.on("QueueOrderChanged", (queue : {id : string, order : number}[]) => {
+            let newQueue : IQueue[] = [];
+            for (let x = 0; x < queue.length; x++) {
+                let newItem = items.find(item => item.Id == queue[x].id);
+                if (!newItem) console.log("Error: cannot change queue order");
+                newItem.Order = queue[x].order;
+                newQueue.push(newItem);
+            }
             setItems(newQueue);
         })
     }, [hub, items])
