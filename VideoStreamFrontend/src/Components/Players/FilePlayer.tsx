@@ -152,7 +152,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
 
     return params.streamUrls ? (
         <div id="player">
-            <video ref={videoPlayerRef} controls={true} preload={"auto"} muted={true}>
+            <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
                 <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video)?.Url} />
             </video>
             <audio ref={audioPlayerRef} preload={"auto"}>
