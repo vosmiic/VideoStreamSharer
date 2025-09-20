@@ -1,6 +1,4 @@
 import * as constants from "../Constants/constants.tsx";
-import QueueAddBody from "../Models/QueueAdd.tsx";
-import QueueOrder from "../Models/QueueOrder.tsx";
 import {IQueueAdd} from "../Interfaces/IQueueAdd.tsx";
 
 
@@ -23,7 +21,7 @@ export async function AddToQueue(roomId : string, input : IQueueAdd) {
     });
 }
 
-export async function ChangeQueueOrder(roomId : string, request : [QueueOrder]) {
+export async function ChangeQueueOrder(roomId: string, request) {
     return await fetch(`${constants.API_URL}/queue/${roomId}/order`, {
         method: "PUT",
         headers: {

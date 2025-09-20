@@ -12,11 +12,13 @@ import {IQueue} from "../../Interfaces/IQueue.tsx";
 import {ChangeQueueOrder} from "../../Helpers/ApiCalls.tsx";
 import {RoomContext} from "../../Contexts/RoomContext.tsx";
 import {HubContext} from "../../Contexts/HubContext.tsx";
+import {QueueOrder} from "../../Models/QueueOrder.tsx";
 
 export default function Queue({queueItems}) {
     const roomId = useContext(RoomContext);
     const hub = useContext(HubContext);
     const [items, setItems] = useState<IQueue[]>(queueItems || []);
+    const [disableDragging, setDisableDragging] = useState<boolean>(false);
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -25,29 +27,27 @@ export default function Queue({queueItems}) {
     );
 
     function handleDragEnd(event) {
+        setDisableDragging(true);
         const beingMoved = event.active;
         const to = event.over;
         let newQueue = [];
 
         if (beingMoved.id !== to.id) {
-            setItems((items) => {
-                const queueItemsIds = items.map(queueItem => queueItem.Id);
-                const oldIndex = queueItemsIds.indexOf(beingMoved.id);
-                const newIndex = queueItemsIds.indexOf(to.id);
+            const queueItemsIds = items.map(queueItem => queueItem.Id);
+            const oldIndex = queueItemsIds.indexOf(beingMoved.id);
+            const newIndex = queueItemsIds.indexOf(to.id);
 
-                newQueue = arrayMove(items, oldIndex, newIndex);
-                for (var i = 0; i < newQueue.length; i++) {
-                    newQueue[i].Order = i;
-                }
-                return newQueue;
-            })
+            newQueue = arrayMove(items, oldIndex, newIndex);
+            for (var i = 0; i < newQueue.length; i++) {
+                newQueue[i].Order = i;
+            }
+            setItems(newQueue);
         }
 
-        const changedItems = newQueue.filter((queueItem, i) => queueItem != items[i]);
-        ChangeQueueOrder(roomId, changedItems)
+        ChangeQueueOrder(roomId, newQueue.map((item) => {return {Id : item.Id, Order : item.Order} as QueueOrder}))
             .catch((error) => {
                 console.log(error); // todo needs to be properly handled
-        });
+        }).finally(() => setDisableDragging(false));
     }
 
     function sortQueueItems(a : IQueue, b : IQueue) {
@@ -104,7 +104,7 @@ export default function Queue({queueItems}) {
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}>
-            <div className={"grid grid-cols-1 gap-4"}>
+            <div className={`grid grid-cols-1 gap-4 ${disableDragging ? "pointer-events-none" : ""}`}>
                 <SortableContext items={items} strategy={verticalListSortingStrategy}>
                     {items.sort(sortQueueItems).map(item => <QueueItem key={item.Id} queueItem={item} />)}
                 </SortableContext>

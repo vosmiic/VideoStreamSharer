@@ -1,4 +1,4 @@
-export default class QueueOrder {
+export interface QueueOrder {
     Id: string;
     Order: number;
 }
