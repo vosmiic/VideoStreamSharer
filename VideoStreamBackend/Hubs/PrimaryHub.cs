@@ -24,7 +24,7 @@ public class PrimaryHub : Hub {
     private readonly string PlayVideoMethod = "PlayVideo";
     private readonly string TimeUpdateMethod = "TimeUpdate";
     public static readonly string QueueAdded = "QueueAdded";
-    private readonly string VideoFinishedMethod = "VideoFinished";
+    public static readonly string VideoFinishedMethod = "VideoFinished";
     private readonly string SetQueueMethod = "SetQueue";
     private readonly string DeleteQueueMethod = "DeleteQueue";
     public static readonly string QueueOrderChangedMethod = "QueueOrderChanged";
@@ -155,26 +155,11 @@ public class PrimaryHub : Hub {
         var parsedRoomId = Guid.Parse(roomId);
         Room? room = await _roomService.GetRoomById(parsedRoomId);
         if (room == null) return;
+        
         QueueItem? latestQueueItem = room.CurrentVideo();
         if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
-        await _queueItemService.Remove(latestQueueItem);
-        
-        // re-order the queue
-        foreach (QueueItem queueItem in room.Queue) {
-            queueItem.Order--;
-        }
 
-        await _queueItemService.SaveChanges();
-        
-        await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, roomId);
-        var result = await RoomHelper.GetStreamUrls(_redis, room);
-        if (result == null) return;
-        await Clients.Group(roomId).SendAsync(VideoFinishedMethod, new GetRoomResponse {
-            Room = new RoomApiModel {
-                StreamUrls = result,
-                Queue = RoomHelper.GetQueueModel(room)
-            }
-        });
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, room, latestQueueItem);
     }
 
     public async Task DeleteVideo(Guid videoId) {
@@ -187,8 +172,8 @@ public class PrimaryHub : Hub {
         QueueItem? queueItem = await _queueItemService.GetQueueItemById(videoId);
         if (queueItem == null || queueItem.Room.Id != parsedRoomId) return;
 
-        if (room.CurrentVideo()?.Id ==  videoId) {
-            await FinishedVideo(videoId);
+        if (room.CurrentVideo()?.Id == videoId) {
+            await QueueHelper.RemoveRoomVideo(_queueItemService,  _redis, _roomService, Clients, room, room.CurrentVideo());
         } else {
             await _queueItemService.Remove(queueItem);
             await Clients.Group(roomId).SendAsync(DeleteQueueMethod, videoId);
