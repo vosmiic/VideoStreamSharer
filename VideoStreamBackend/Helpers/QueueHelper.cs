@@ -18,20 +18,24 @@ public class QueueHelper {
         room.Queue.Remove(videoToDelete);
         
         // re-order the queue
-        foreach (QueueItem queueItem in room.Queue) {
+        foreach (QueueItem queueItem in room.Queue.Where(item => item.Order > videoToDelete.Order)) {
             queueItem.Order--;
         }
 
         await queueItemService.SaveChanges();
-        
-        await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, room.StringifiedId);
-        var result = await RoomHelper.GetStreamUrls(redis, room);
-        if (result == null) return;
-        await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.VideoFinishedMethod, new GetRoomResponse {
-            Room = new RoomApiModel {
-                StreamUrls = result,
-                Queue = RoomHelper.GetQueueModel(room)
-            }
-        });
+
+        if (room.CurrentVideo() == videoToDelete) {
+            await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, room.StringifiedId);
+            var result = await RoomHelper.GetStreamUrls(redis, room);
+            if (result == null) return;
+            await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.VideoFinishedMethod, new GetRoomResponse {
+                Room = new RoomApiModel {
+                    StreamUrls = result,
+                    Queue = RoomHelper.GetQueueModel(room)
+                }
+            });
+        } else {
+            await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.DeleteQueueMethod, videoToDelete.Id);
+        }
     }
 }

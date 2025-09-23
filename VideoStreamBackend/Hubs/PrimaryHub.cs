@@ -26,7 +26,7 @@ public class PrimaryHub : Hub {
     public static readonly string QueueAdded = "QueueAdded";
     public static readonly string VideoFinishedMethod = "VideoFinished";
     private readonly string SetQueueMethod = "SetQueue";
-    private readonly string DeleteQueueMethod = "DeleteQueue";
+    public static readonly string DeleteQueueMethod = "DeleteQueue";
     public static readonly string QueueOrderChangedMethod = "QueueOrderChanged";
     public static readonly string VideoChangedMethod = "VideoChanged";
 
@@ -172,12 +172,7 @@ public class PrimaryHub : Hub {
         QueueItem? queueItem = await _queueItemService.GetQueueItemById(videoId);
         if (queueItem == null || queueItem.Room.Id != parsedRoomId) return;
 
-        if (room.CurrentVideo()?.Id == videoId) {
-            await QueueHelper.RemoveRoomVideo(_queueItemService,  _redis, _roomService, Clients, room, room.CurrentVideo());
-        } else {
-            await _queueItemService.Remove(queueItem);
-            await Clients.Group(roomId).SendAsync(DeleteQueueMethod, videoId);
-        }
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, room, queueItem);
     }
 
     private async Task StatusUpdate(Status status) {
