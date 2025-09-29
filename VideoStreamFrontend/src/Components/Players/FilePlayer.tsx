@@ -12,14 +12,20 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
         if (params.autoplay) {
             videoPlayerRef.current.load();
             audioPlayerRef.current.load();
+
             videoPlayerRef.current.play().catch(() => {
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
             });
-            audioPlayerRef.current.play().catch(() => {
+            audioPlayerRef.current.play().then(() => {
+                audioPlayerRef.current.volume = getVolumeCookie() ?? 50;
+            }, () => {
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
             });
+        } else {
+            videoPlayerRef.current.load();
+            audioPlayerRef.current.load();
         }
 
         setInterval(() => {
@@ -34,6 +40,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
 
         audioPlayerRef.current.addEventListener("loadedmetadata", () => {
             audioPlayerRef.current.currentTime = params.startTime;
+            audioPlayerRef.current.muted = false;
         })
 
         audioPlayerRef.current.addEventListener("play", () => {
@@ -88,7 +95,8 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
                 console.log("play")
                 console.log(videoPlayerRef.current.seeking)
                 if (!videoPlayerRef.current.seeking) {
-                    audioPlayerRef.current.play().catch(() => {
+                    audioPlayerRef.current.play().catch((error) => {
+                        console.log("cant play audio, muting", error)
                         audioPlayerRef.current.volume = 0;
                         audioPlayerRef.current.play();
                     });
@@ -142,9 +150,11 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
         }
     }, [hub]);
 
-    function changeVolume(element) {
+    function changeVolume(newVolume : number) {
         var paused = !audioPlayerRef.current.paused && videoPlayerRef.current.paused; // covers odd behavior where audio plays automatically when changing volume
-        audioPlayerRef.current.volume = element.target.value / 100;
+        audioPlayerRef.current.volume = newVolume;
+        audioPlayerRef.current.muted = false;
+        document.cookie = `volume=${newVolume}; Path=/room`;
         if (paused)
             audioPlayerRef.current.pause();
     }
@@ -155,10 +165,10 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
             <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
                 <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video)?.Url} />
             </video>
-            <audio ref={audioPlayerRef} preload={"auto"}>
+            <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
                 <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url} />
             </audio>
-            <input type={"range"} onChange={changeVolume}/>
+            <input type={"range"} onChange={(element) => changeVolume(element.target.value / 100)}/>
         </div>
     ) : <></>
 }
