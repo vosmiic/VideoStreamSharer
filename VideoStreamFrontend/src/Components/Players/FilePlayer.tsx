@@ -18,7 +18,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
                 audioPlayerRef.current.play();
             });
             audioPlayerRef.current.play().then(() => {
-                audioPlayerRef.current.volume = getVolumeCookie() ?? 50;
+                // audioPlayerRef.current.volume = getVolumeCookie() ?? 50;
             }, () => {
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
@@ -163,7 +163,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
     return params.streamUrls ? (
         <div id="player">
             <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
-                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video)?.Url} />
+                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url} />
             </video>
             <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
                 <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url} />

@@ -14,7 +14,7 @@ public class QueueHelper {
         return new Uri($"{originalUri.GetLeftPart(UriPartial.Path)}?v={parameters["v"]}");
     }
 
-    internal static async Task RemoveRoomVideo(IQueueItemService queueItemService, IDatabase redis, IRoomService roomService, IHubCallerClients clients, Room room, QueueItem videoToDelete) {
+    internal static async Task RemoveRoomVideo(IQueueItemService queueItemService, IDatabase redis, IRoomService roomService, IHubCallerClients clients, HttpRequest request, Room room, QueueItem videoToDelete) {
         room.Queue.Remove(videoToDelete);
         
         // re-order the queue
@@ -26,7 +26,7 @@ public class QueueHelper {
 
         if (room.CurrentVideo() == videoToDelete) {
             await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, room.StringifiedId);
-            var result = await RoomHelper.GetStreamUrls(redis, room);
+            var result = await RoomHelper.GetStreamUrls(redis, request, room);
             if (result == null) return;
             await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.VideoFinishedMethod, new GetRoomResponse {
                 Room = new RoomApiModel {

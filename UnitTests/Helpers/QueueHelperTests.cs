@@ -1,11 +1,10 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Hubs;
-using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.YtDlp;
 using VideoStreamBackend.Redis;
@@ -77,7 +76,7 @@ public class QueueHelperTests {
         
         _queueItemService.BulkAddOrUpdate(room.Queue);
         RemoveVideoMockSetups(room.StringifiedId);
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis.Object, _roomService, _clients.Object, room, toBeDeleted);
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis.Object, _roomService, _clients.Object, new Mock<HttpRequest>().Object, room, toBeDeleted);
         
         Assert.That(room.Queue.Count, Is.EqualTo(2));
         Assert.That(room.Queue.MaxBy(queue => queue.Order)?.Order, Is.EqualTo(1));
@@ -110,7 +109,7 @@ public class QueueHelperTests {
         
         _queueItemService.BulkAddOrUpdate(room.Queue);
         RemoveVideoMockSetups(room.StringifiedId);
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis.Object, _roomService, _clients.Object, room, toBeDeleted);
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis.Object, _roomService, _clients.Object, new Mock<HttpRequest>().Object, room, toBeDeleted);
         
         Assert.That(room.Queue.Count, Is.EqualTo(2));
         Assert.That(room.Queue.FirstOrDefault(item => item.Order == 0), Is.Not.Null);

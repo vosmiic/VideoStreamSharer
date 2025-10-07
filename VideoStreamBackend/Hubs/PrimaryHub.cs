@@ -159,7 +159,7 @@ public class PrimaryHub : Hub {
         QueueItem? latestQueueItem = room.CurrentVideo();
         if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
 
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, room, latestQueueItem);
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, Context.GetHttpContext().Request, room, latestQueueItem);
     }
 
     public async Task DeleteVideo(Guid videoId) {
@@ -172,7 +172,7 @@ public class PrimaryHub : Hub {
         QueueItem? queueItem = await _queueItemService.GetQueueItemById(videoId);
         if (queueItem == null || queueItem.Room.Id != parsedRoomId) return;
 
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, room, queueItem);
+        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, Context.GetHttpContext().Request, room, queueItem);
     }
 
     private async Task StatusUpdate(Status status) {

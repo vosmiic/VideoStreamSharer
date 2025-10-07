@@ -1,4 +1,5 @@
 export enum StreamType {
     Video,
-    Audio
+    Audio,
+    VideoAndAudio
 }

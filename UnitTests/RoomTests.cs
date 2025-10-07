@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Moq;
 using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
@@ -33,7 +34,7 @@ public class RoomTests {
             Id = Guid.Empty
         };
 
-        List<StreamUrl>? streamUrls = await RoomHelper.GetStreamUrls(redisMock.Object, room);
+        List<StreamUrl>? streamUrls = await RoomHelper.GetStreamUrls(redisMock.Object, new Mock<HttpRequest>().Object, room);
         
         Assert.That(streamUrls, Is.Not.Null);
         Assert.That(streamUrls, Is.Not.Empty);

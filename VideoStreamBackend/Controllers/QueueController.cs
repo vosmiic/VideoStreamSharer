@@ -1,6 +1,9 @@
 using System.Text;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Net.Http.Headers;
 using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Hubs;
@@ -20,11 +23,13 @@ public class QueueController : Controller {
     private readonly IQueueItemService _queueItemService;
     private IHubContext<PrimaryHub> _primaryHubContext { get; set; }
     private readonly IDatabase  _redis;
+    private readonly IConfiguration _configuration;
 
-    public QueueController(IRoomService roomService, IQueueItemService queueItemService, IHubContext<PrimaryHub> primaryHubContext, IConnectionMultiplexer connectionMultiplexer) {
+    public QueueController(IRoomService roomService, IQueueItemService queueItemService, IHubContext<PrimaryHub> primaryHubContext, IConnectionMultiplexer connectionMultiplexer, IConfiguration configuration) {
         _roomService = roomService;
         _queueItemService = queueItemService;
         _primaryHubContext = primaryHubContext;
+        _configuration = configuration;
         _redis = connectionMultiplexer.GetDatabase();
     }
 
@@ -50,7 +55,7 @@ public class QueueController : Controller {
             VideoFormatId = data.VideoFormatId,
             AudioFormatId = data.AudioFormatId,
             ThumbnailLocation = info.videoInfo.Thumbnail,
-            Order = room.Queue.Count > 1 ? room.Queue.Max(queue => queue.Order) + 1 : 0,
+            Order = room.Queue.Any() ? room.Queue.Max(queue => queue.Order) + 1 : 0,
         };
         room.Queue.Add(video);
         await _roomService.SaveChanges();
@@ -99,10 +104,11 @@ public class QueueController : Controller {
         string stringifiedRoomId = roomId.ToString();
         if (currentVideoChanged) {
             await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, stringifiedRoomId);
-            List<StreamUrl>? newStreamUrls = await RoomHelper.GetStreamUrls(_redis, room);
+            List<StreamUrl>? newStreamUrls = await RoomHelper.GetStreamUrls(_redis, Request, room);
             if (newStreamUrls == null)  return new BadRequestResult();
             await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.VideoChangedMethod, newStreamUrls);
         }
+        
         await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.QueueOrderChangedMethod, room.Queue.Select(queueItem => new {queueItem.Id, queueItem.Order}));
         return Ok();
     }
@@ -142,6 +148,63 @@ public class QueueController : Controller {
         };
 
         return Ok(model);
+    }
+
+    [HttpPost]
+    [Route("{roomId}/upload")]
+    [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
+    public async Task<IActionResult> UploadVideo([FromRoute] Guid roomId) {
+        if (!Request.ContentType?.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase) ?? false) {
+            return BadRequest("Unsupported content type");
+        }
+        
+        Room? room = await _roomService.GetRoomById(roomId);
+        if (room == null) return new NotFoundResult();
+
+        string? boundary = HeaderUtilities.RemoveQuotes(MediaTypeHeaderValue.Parse(Request.ContentType).Boundary).Value;
+        if (boundary == null) return BadRequest("No boundary");
+        
+        var reader = new MultipartReader(boundary, Request.Body);
+        CancellationToken cancellationToken = HttpContext.RequestAborted;
+        string? path = null;
+        string? fileName = null;
+
+        try {
+            while (await reader.ReadNextSectionAsync(cancellationToken) is { } section) {
+                ContentDispositionHeaderValue? contentDisposition = section.GetContentDispositionHeader();
+                if (contentDisposition != null && contentDisposition.IsFileDisposition()) {
+                    fileName = contentDisposition.FileName.Value ?? contentDisposition.FileNameStar.Value;
+                    if (!string.IsNullOrEmpty(fileName)) {
+                        fileName = HeaderUtilities.RemoveQuotes(fileName).Value;
+                    } else {
+                        return BadRequest("No filename");
+                    }
+
+                    var filePath = RoomHelper.GetVideoFilePath(_configuration, roomId, fileName);
+                    if (!filePath.success) return BadRequest($"Error: {filePath.error}");
+                    path = filePath.filePath;
+                    await using FileStream fileStream = new FileStream(path: filePath.filePath, mode: FileMode.Create, access: FileAccess.Write, share: FileShare.None, bufferSize: 16 * 1024 * 1024, useAsync: true);
+                    await section.Body.CopyToAsync(fileStream, cancellationToken);
+                } else {
+                    return BadRequest("No content");
+                }
+            }
+        } catch (Exception ex) {
+            Console.WriteLine(ex.Message); //todo log this properly
+        }
+
+        if (path == null) return BadRequest("No video path");
+        
+        UploadedMedia uploadedMedia = new UploadedMedia {
+            Title = fileName,
+            Path = path.Replace(_configuration["videoUploadStorageFolder"], ""),
+            Order = room.Queue.Any() ? room.Queue.Max(queue => queue.Order) + 1 : 0,
+        };
+        room.Queue.Add(uploadedMedia);
+        await _roomService.SaveChanges();
+        await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.QueueAdded, uploadedMedia, cancellationToken: cancellationToken);
+
+        return Ok();
     }
 
     private static async Task<(VideoInfo? videoInfo, string? error)> RetrieveVideoInfoWithRetries(YtDlpHelper ytDlpHelper, Uri uri) {

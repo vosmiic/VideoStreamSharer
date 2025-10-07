@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using StackExchange.Redis;
 using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Identity;
@@ -58,6 +59,16 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.Use((context, next) => {
+    context.Request.EnableBuffering();
+    return next();
+});
+
+app.UseStaticFiles(new StaticFileOptions {
+    FileProvider = new PhysicalFileProvider(builder.Configuration["videoUploadStorageFolder"]),
+    RequestPath = "/files"
+});
 
 app.MapHub<PrimaryHub>("/hub");
 app.MapHub<StreamHub>("/streamHub");

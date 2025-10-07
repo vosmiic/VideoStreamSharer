@@ -1,3 +1,5 @@
+using System.Security;
+using System.Security.AccessControl;
 using System.Text;
 using System.Text.Json;
 using CliWrap;
@@ -17,15 +19,24 @@ public class RoomHelper {
     /// Retrieve the stream URLs from either redis or generate them.
     /// </summary>
     /// <param name="redis">Instance of <see cref="IDatabase"/>.</param>
+    /// <param name="request">Request from user.</param>
     /// <param name="room">Instance of <see cref="Room"/> to get the stream URLs of.</param>
     /// <returns>List of <see cref="StreamUrl"/>s.</returns>
-    internal static async Task<List<StreamUrl>?> GetStreamUrls(IDatabase redis, Room room) {
-        string roomId = room.Id.ToString();
-        RedisValue? videoUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentVideoField());
-        RedisValue? audioUrlFromRedis = await redis.HashGetAsync(roomId, RedisKeys.RoomCurrentAudioField());
+    internal static async Task<List<StreamUrl>?> GetStreamUrls(IDatabase redis, HttpRequest request, Room room) {
+        QueueItem? queueItem = room.CurrentVideo();
+        if (queueItem is UploadedMedia uploadedMedia) {
+            return [
+                new StreamUrl {
+                    StreamType = StreamType.VideoAndAudio,
+                    Url = GetVideoFileUrl(request, uploadedMedia.Path),
+                }
+            ];
+        }
+        
+        RedisValue? videoUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentVideoField());
+        RedisValue? audioUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentAudioField());
 
         List<StreamUrl> streamUrls = new List<StreamUrl>();
-        QueueItem? queueItem = room.CurrentVideo();
         if (videoUrlFromRedis is { HasValue: true } || audioUrlFromRedis is { HasValue: true }) {
             // retrieve the urls
             if (videoUrlFromRedis.HasValue) {
@@ -45,13 +56,13 @@ public class RoomHelper {
 
             foreach (StreamUrl streamUrl in result.urls) {
                 if (streamUrl.StreamType == StreamType.Video) {
-                    redis.HashSet(roomId, RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(roomId, [ RedisKeys.RoomCurrentVideoField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
+                    redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(streamUrl));
+                    await redis.HashFieldExpireAsync(room.StringifiedId, [ RedisKeys.RoomCurrentVideoField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
                 }
 
                 if (streamUrl.StreamType == StreamType.Audio) {
-                    redis.HashSet(roomId, RedisKeys.RoomCurrentAudioField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(roomId, [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
+                    redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentAudioField(), JsonSerializer.Serialize(streamUrl));
+                    await redis.HashFieldExpireAsync(room.StringifiedId, [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
                 }
             }
 
@@ -78,4 +89,35 @@ public class RoomHelper {
             Order = q.Order,
             Type = q.GetType().Name
         });
+
+    public static (bool success, string? error, string? filePath) GetVideoFilePath(IConfiguration configuration, Guid roomId, string fileName) {
+        string? rootUploadDirectoryConfig = configuration["videoUploadStorageFolder"];
+        if (rootUploadDirectoryConfig == null) return (false, "Video upload storage folder configuration entry missing", null);
+        DirectoryInfo rootUploadDirectory = new DirectoryInfo(rootUploadDirectoryConfig);
+        if (!rootUploadDirectory.Exists) return (false, "Video upload storage folder does not exist", null);
+
+        try {
+            rootUploadDirectory.EnumerateFiles();
+        } catch (SecurityException) {
+            return (false, "Cannot read video upload storage folder", null);
+        }
+
+        try {
+            string temporaryFile = Path.Combine(rootUploadDirectoryConfig, $"temp_write_test_{Guid.NewGuid()}.tmp");
+            File.WriteAllText(temporaryFile, string.Empty);
+            File.Delete(temporaryFile);
+        } catch (UnauthorizedAccessException) {
+            return (false, "Cannot write video upload storage folder", null);
+        } catch (SecurityException) {
+            return (false, "Cannot write video upload storage folder", null);
+        }
+        
+        string extension = Path.GetExtension(fileName);
+        var roomDirectory = Path.Combine(rootUploadDirectoryConfig, roomId.ToString());
+        Directory.CreateDirectory(roomDirectory);
+        
+        return (true, null, Path.Combine(roomDirectory, $"{Guid.NewGuid().ToString().Replace("-", "")}{extension}"));
+    }
+
+    private static string GetVideoFileUrl(HttpRequest request, string videoPath) => $"{request.Scheme}://{request.Host}{request.PathBase}/files{(videoPath.StartsWith('/') ? videoPath : $"/{videoPath}")}";
 }

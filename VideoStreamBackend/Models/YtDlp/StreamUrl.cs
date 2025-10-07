@@ -11,5 +11,6 @@ public class StreamUrl {
 
 public enum StreamType {
     Video,
-    Audio
+    Audio,
+    VideoAndAudio
 }

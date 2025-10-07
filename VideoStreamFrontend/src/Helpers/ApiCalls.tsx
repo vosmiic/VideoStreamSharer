@@ -49,3 +49,10 @@ export async function Lookup(url : string) {
         }
     });
 }
+
+export async function UploadVideo(roomId : string, data : FormData) {
+    return await fetch(`${constants.API_URL}/queue/${roomId}/upload`, {
+        method: "POST",
+        body: data
+    })
+}
