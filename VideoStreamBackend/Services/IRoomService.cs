@@ -5,5 +5,6 @@ namespace VideoStreamBackend.Services;
 
 public interface IRoomService {
     public Task SaveChanges();
+    public void Detach(Room room);
     public Task<Room?> GetRoomById(Guid id);
 }

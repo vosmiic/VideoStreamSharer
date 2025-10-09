@@ -8,6 +8,10 @@ public class RoomService : IRoomService {
         return Task.CompletedTask;
     }
 
+    public void Detach(Room room) {
+        throw new NotImplementedException();
+    }
+
     public Task<Room?> GetRoomById(Guid id) {
         throw new NotImplementedException();
     }
