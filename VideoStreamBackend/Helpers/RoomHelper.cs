@@ -81,43 +81,59 @@ public class RoomHelper {
         redis.HashDelete(roomId, RedisKeys.RoomCurrentAudioField());
     }
 
-    public static IEnumerable<QueueItemApiModel> GetQueueModel(Room room) =>
+    /// <summary>
+    /// Get the <see cref="Room"/>'s related queue in <see cref="QueueItemApiModel"/> format.
+    /// </summary>
+    /// <param name="room"><see cref="Room"/> to get the queue of.</param>
+    /// <param name="request"><see cref="HttpRequest"/> made to retreive this data.</param>
+    /// <returns>Enumerable of queue items.</returns>
+    public static IEnumerable<QueueItemApiModel> GetQueueModel(Room room, HttpRequest request) =>
         room.Queue.Select(q => new QueueItemApiModel {
             Id = q.Id,
             Title = q.Title,
-            ThumbnailLocation = q.ThumbnailLocation,
+            ThumbnailLocation = q is UploadedMedia ? GetVideoFileUrl(request, q.ThumbnailLocation) : q.ThumbnailLocation,
             Order = q.Order,
             Type = q.GetType().Name
         });
 
-    public static (bool success, string? error, string? filePath) GetVideoFilePath(IConfiguration configuration, Guid roomId, string fileName) {
+    /// <summary>
+    /// Generate a new file path for a video file.
+    /// </summary>
+    /// <param name="roomDirectory">Directory of the room.</param>
+    /// <param name="fileName">Name of video file.</param>
+    /// <returns>New video file name.</returns>
+    public static string GetVideoFilePath(string roomDirectory, string fileName) =>
+        Path.Combine(roomDirectory, $"{Guid.NewGuid().ToString().Replace("-", "")}{Path.GetExtension(fileName)}");
+
+    /// <summary>
+    /// Get the supplied <see cref="Room"/>'s directory to store associated files.
+    /// </summary>
+    /// <param name="configuration">Instance of <see cref="IConfiguration"/></param>
+    /// <param name="roomId">ID of the room to the directory of.</param>
+    /// <returns>Path of the <see cref="Room"/>'s directory if successful, true if successful, error if failure.</returns>
+    public static (string? path, bool success, string? error) GetRoomDirectory(IConfiguration configuration, Guid roomId) {
         string? rootUploadDirectoryConfig = configuration["videoUploadStorageFolder"];
-        if (rootUploadDirectoryConfig == null) return (false, "Video upload storage folder configuration entry missing", null);
+        if (rootUploadDirectoryConfig == null) return (null, false, "Video upload storage folder configuration entry missing");
         DirectoryInfo rootUploadDirectory = new DirectoryInfo(rootUploadDirectoryConfig);
-        if (!rootUploadDirectory.Exists) return (false, "Video upload storage folder does not exist", null);
+        if (!rootUploadDirectory.Exists) return (null, false, "Video upload storage folder does not exist");
 
-        try {
-            rootUploadDirectory.EnumerateFiles();
-        } catch (SecurityException) {
-            return (false, "Cannot read video upload storage folder", null);
-        }
-
-        try {
-            string temporaryFile = Path.Combine(rootUploadDirectoryConfig, $"temp_write_test_{Guid.NewGuid()}.tmp");
-            File.WriteAllText(temporaryFile, string.Empty);
-            File.Delete(temporaryFile);
-        } catch (UnauthorizedAccessException) {
-            return (false, "Cannot write video upload storage folder", null);
-        } catch (SecurityException) {
-            return (false, "Cannot write video upload storage folder", null);
+        var directoryPermissions = FileHelper.GetDirectoryPermissions(rootUploadDirectory);
+        if (!directoryPermissions.read || !directoryPermissions.write) {
+            if (directoryPermissions is { read: false, write: false }) return (null, false, "No read or write permissions on video upload storage directory");
+            if (!directoryPermissions.read) return (null, false, "No read permissions on video upload storage folder");
+            if (!directoryPermissions.write) return (null, false, "No write permissions on video upload storage folder");
         }
         
-        string extension = Path.GetExtension(fileName);
         var roomDirectory = Path.Combine(rootUploadDirectoryConfig, roomId.ToString());
         Directory.CreateDirectory(roomDirectory);
-        
-        return (true, null, Path.Combine(roomDirectory, $"{Guid.NewGuid().ToString().Replace("-", "")}{extension}"));
+        return (roomDirectory, true, null);
     }
 
-    private static string GetVideoFileUrl(HttpRequest request, string videoPath) => $"{request.Scheme}://{request.Host}{request.PathBase}/files{(videoPath.StartsWith('/') ? videoPath : $"/{videoPath}")}";
+    /// <summary>
+    /// Get URL of video file.
+    /// </summary>
+    /// <param name="request"><see cref="HttpRequest"/> made to retrieve this data.</param>
+    /// <param name="videoPath">Path of the video file to get the URL of.</param>
+    /// <returns>URL of video file.</returns>
+    public static string GetVideoFileUrl(HttpRequest request, string videoPath) => $"{request.Scheme}://{request.Host}{request.PathBase}/files{(videoPath.StartsWith('/') ? videoPath : $"/{videoPath}")}";
 }

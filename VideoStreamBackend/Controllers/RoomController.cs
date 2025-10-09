@@ -59,7 +59,7 @@ public class RoomController : Controller {
                 StreamUrls = room.CurrentVideo() != null ? await RoomHelper.GetStreamUrls(_redis, Request, room) : null,
                 Status = room.Status,
                 CurrentTime = currentTime,
-                Queue = RoomHelper.GetQueueModel(room)
+                Queue = RoomHelper.GetQueueModel(room, Request)
             },
             Users = connections.Length > 0 ? connections.Select(connection => connection.Value.ToString()) : Array.Empty<string>()
         });

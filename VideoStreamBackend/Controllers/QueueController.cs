@@ -1,5 +1,6 @@
 using System.Text;
-using Microsoft.AspNetCore.Http.HttpResults;
+using FileSignatures;
+using FileSignatures.Formats;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.WebUtilities;
@@ -180,10 +181,11 @@ public class QueueController : Controller {
                         return BadRequest("No filename");
                     }
 
-                    var filePath = RoomHelper.GetVideoFilePath(_configuration, roomId, fileName);
-                    if (!filePath.success) return BadRequest($"Error: {filePath.error}");
-                    path = filePath.filePath;
-                    await using FileStream fileStream = new FileStream(path: filePath.filePath, mode: FileMode.Create, access: FileAccess.Write, share: FileShare.None, bufferSize: 16 * 1024 * 1024, useAsync: true);
+                    var roomDirectoryTask = RoomHelper.GetRoomDirectory(_configuration, roomId);
+                    if (!roomDirectoryTask.success || roomDirectoryTask.path == null) return BadRequest($"Error: {roomDirectoryTask.error}");
+                    string filePath = RoomHelper.GetVideoFilePath(roomDirectoryTask.path, fileName);
+                    path = filePath;
+                    await using FileStream fileStream = new FileStream(path: filePath, mode: FileMode.Create, access: FileAccess.Write, share: FileShare.None, bufferSize: 16 * 1024 * 1024, useAsync: true);
                     await section.Body.CopyToAsync(fileStream, cancellationToken);
                 } else {
                     return BadRequest("No content");
@@ -200,8 +202,33 @@ public class QueueController : Controller {
             Path = path.Replace(_configuration["videoUploadStorageFolder"], ""),
             Order = room.Queue.Any() ? room.Queue.Max(queue => queue.Order) + 1 : 0,
         };
+
+        YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
+        var generateThumbnailTask = await QueueHelper.GenerateThumbnail(ytDlpHelper, _configuration, roomId, path, Guid.NewGuid().ToString().Replace("-", ""));
+        if (generateThumbnailTask is { success: false, thumbnailPath: not null }) {
+            Console.WriteLine(generateThumbnailTask.error); // todo log this
+            string? staticFileDirectory = _configuration["staticFileDirectory"];
+            if (string.IsNullOrWhiteSpace(staticFileDirectory)) return BadRequest("No static file folder in configuration");
+            DirectoryInfo staticFileDirectoryInfo = new DirectoryInfo(staticFileDirectory);
+            if (!staticFileDirectoryInfo.Exists) return BadRequest("Static file directory not found");
+            var staticFileDirectoryPermissions = FileHelper.GetDirectoryPermissions(staticFileDirectoryInfo);
+            if (!staticFileDirectoryPermissions.read) return BadRequest("Cannot read static file directory");
+            FileInfo? defaultThumbnailFile = staticFileDirectoryInfo.EnumerateFiles("defaultThumbnail.*").FirstOrDefault();
+            if (defaultThumbnailFile == null) return BadRequest("No default thumbnail file found in static file directory");
+            FileFormatInspector fileFormatInspector = new FileFormatInspector();
+            var format = fileFormatInspector.DetermineFileFormat(defaultThumbnailFile.OpenRead());
+            if (format == null) return BadRequest("File format of default thumbnail file could not be determined");
+            if (format is not Image) return BadRequest($"Invalid default thumbnail file format; must be an image, detected format: {format.MediaType}");
+            uploadedMedia.ThumbnailLocation = defaultThumbnailFile.FullName.Replace(_configuration["videoUploadStorageFolder"], "");
+        } else {
+            uploadedMedia.ThumbnailLocation = generateThumbnailTask.thumbnailPath.Replace(_configuration["videoUploadStorageFolder"], "");
+        }
+        
         room.Queue.Add(uploadedMedia);
         await _roomService.SaveChanges();
+        _roomService.Detach(room);
+        uploadedMedia.Path = RoomHelper.GetVideoFileUrl(Request, uploadedMedia.Path);
+        uploadedMedia.ThumbnailLocation = RoomHelper.GetVideoFileUrl(Request, uploadedMedia.ThumbnailLocation);
         await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.QueueAdded, uploadedMedia, cancellationToken: cancellationToken);
 
         return Ok();

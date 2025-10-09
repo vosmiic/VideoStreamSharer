@@ -10,6 +10,7 @@
     <ItemGroup>
         <InternalsVisibleTo Include="UnitTests" />
         <PackageReference Include="CliWrap" Version="3.9.0" />
+        <PackageReference Include="FileSignatures" Version="6.1.1" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.0" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />
