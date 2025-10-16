@@ -19,7 +19,7 @@ public class PrimaryHub : Hub {
     #region HubMethods
 
     private readonly string StatusChangeMethod = "StatusChange";
-    private readonly string LoadVideoMethod = "LoadVideo";
+    public static readonly string LoadVideoMethod = "LoadVideo";
     private readonly string PauseVideoMethod = "PauseVideo";
     private readonly string PlayVideoMethod = "PlayVideo";
     private readonly string TimeUpdateMethod = "TimeUpdate";

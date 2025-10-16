@@ -227,9 +227,10 @@ public class QueueController : Controller {
         room.Queue.Add(uploadedMedia);
         await _roomService.SaveChanges();
         _roomService.Detach(room);
-        uploadedMedia.Path = RoomHelper.GetVideoFileUrl(Request, uploadedMedia.Path);
         uploadedMedia.ThumbnailLocation = RoomHelper.GetVideoFileUrl(Request, uploadedMedia.ThumbnailLocation);
         await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.QueueAdded, uploadedMedia, cancellationToken: cancellationToken);
+        if (uploadedMedia.Order == 0)
+            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(_redis, Request, room), cancellationToken: cancellationToken);
 
         return Ok();
     }
