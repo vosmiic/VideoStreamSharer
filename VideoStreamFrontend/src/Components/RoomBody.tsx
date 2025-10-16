@@ -68,11 +68,11 @@ export default function RoomBody(params: {roomId: string}) {
 
 
     useEffect(() => {
-        const handleVideoFinished = (room: {streamUrls : StreamUrl[], queue : IQueue[]}) => {
-            setStreamUrls(room.streamUrls);
+        const handleVideoFinished = (Data: {Room: {StreamUrls : StreamUrl[], Queue : IQueue[]}}) => {
+            setStreamUrls(Data.Room.StreamUrls);
             setRoomStatus(VideoStatus.Playing);
             setCurrentTime(0);
-            setQueueItems(room.queue);
+            setQueueItems(Data.Room.Queue);
         };
 
         hub.on("VideoFinished", handleVideoFinished);
