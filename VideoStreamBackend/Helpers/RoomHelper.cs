@@ -24,6 +24,7 @@ public class RoomHelper {
     /// <returns>List of <see cref="StreamUrl"/>s.</returns>
     internal static async Task<List<StreamUrl>?> GetStreamUrls(IDatabase redis, HttpRequest request, Room room) {
         QueueItem? queueItem = room.CurrentVideo();
+        if (queueItem == null) return new List<StreamUrl>();
         if (queueItem is UploadedMedia uploadedMedia) {
             return [
                 new StreamUrl {

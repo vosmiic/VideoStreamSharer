@@ -24,7 +24,7 @@ public class QueueHelper {
 
         await queueItemService.SaveChanges();
 
-        if (room.CurrentVideo() == videoToDelete) {
+        if (videoToDelete.Order == 0) {
             await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, room.StringifiedId);
             var result = await RoomHelper.GetStreamUrls(redis, request, room);
             if (result == null) return;
