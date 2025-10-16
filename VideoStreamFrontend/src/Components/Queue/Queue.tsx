@@ -14,10 +14,9 @@ import {RoomContext} from "../../Contexts/RoomContext.tsx";
 import {HubContext} from "../../Contexts/HubContext.tsx";
 import {QueueOrder} from "../../Models/QueueOrder.tsx";
 
-export default function Queue({queueItems}) {
+export default function Queue(params: {queueItems : IQueue[], setQueueItems: (queue: IQueue[]) => void}) {
     const roomId = useContext(RoomContext);
     const hub = useContext(HubContext);
-    const [items, setItems] = useState<IQueue[]>(queueItems || []);
     const [disableDragging, setDisableDragging] = useState<boolean>(false);
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -33,15 +32,15 @@ export default function Queue({queueItems}) {
         let newQueue = [];
 
         if (beingMoved.id !== to.id) {
-            const queueItemsIds = items.map(queueItem => queueItem.Id);
+            const queueItemsIds = params.queueItems.map(queueItem => queueItem.Id);
             const oldIndex = queueItemsIds.indexOf(beingMoved.id);
             const newIndex = queueItemsIds.indexOf(to.id);
 
-            newQueue = arrayMove(items, oldIndex, newIndex);
+            newQueue = arrayMove(params.queueItems, oldIndex, newIndex);
             for (var i = 0; i < newQueue.length; i++) {
                 newQueue[i].Order = i;
             }
-            setItems(newQueue);
+            params.setQueueItems(newQueue);
         }
 
         ChangeQueueOrder(roomId, newQueue.map((item) => {return {Id : item.Id, Order : item.Order} as QueueOrder}))
@@ -60,42 +59,28 @@ export default function Queue({queueItems}) {
         }
     }
 
-    // Update internal state when props change
-    useEffect(() => {
-        if (queueItems) {
-            setItems(queueItems);
-        }
-    }, [queueItems]);
-
 
     useEffect(() => {
-        hub.on("QueueAdded", (queueItem) => {
-            const item : IQueue = {
-                Title : queueItem.title,
-                ThumbnailLocation : queueItem.thumbnailLocation,
-                Order : queueItem.order,
-                Id : queueItem.id,
-                Type : queueItem.type
-            };
-            setItems([...items, item]);
+        hub.on("QueueAdded", (queueItem : IQueue) => {
+            params.setQueueItems([...params.queueItems, queueItem]);
         });
 
         hub.on("DeleteQueue", (id : string) => {
-            const newQueue = items.filter(item => item.Id != id);
-            setItems(newQueue);
+            const newQueue = params.queueItems.filter(item => item.Id != id);
+            params.setQueueItems(newQueue);
         });
 
-        hub.on("QueueOrderChanged", (queue : {id : string, order : number}[]) => {
+        hub.on("QueueOrderChanged", (Queue : {Id : string, Order : number}[]) => {
             let newQueue : IQueue[] = [];
-            for (let x = 0; x < queue.length; x++) {
-                let newItem = items.find(item => item.Id == queue[x].id);
+            for (let x = 0; x < Queue.length; x++) {
+                let newItem = params.queueItems.find(item => item.Id == Queue[x].Id);
                 if (!newItem) console.log("Error: cannot change queue order");
-                newItem.Order = queue[x].order;
+                newItem.Order = Queue[x].Order;
                 newQueue.push(newItem);
             }
-            setItems(newQueue);
+            params.setQueueItems(newQueue);
         })
-    }, [hub, items])
+    }, [hub, params.queueItems])
 
     return (
         <div>
@@ -105,8 +90,8 @@ export default function Queue({queueItems}) {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}>
             <div className={`grid grid-cols-1 gap-4 ${disableDragging ? "pointer-events-none" : ""}`}>
-                <SortableContext items={items} strategy={verticalListSortingStrategy}>
-                    {items.sort(sortQueueItems).map(item => <QueueItem key={item.Id} queueItem={item} />)}
+                <SortableContext items={params.queueItems} strategy={verticalListSortingStrategy}>
+                    {params.queueItems.sort(sortQueueItems).map(item => <QueueItem key={item.Id} queueItem={item} />)}
                 </SortableContext>
             </div>
         </DndContext>

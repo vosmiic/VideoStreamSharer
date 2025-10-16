@@ -2,7 +2,7 @@ import {useContext, useEffect, useState} from "react";
 import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
-import {GetRoomResponse} from "../Interfaces/IRoom.tsx";
+import {GetRoomResponse, IRoom} from "../Interfaces/IRoom.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
@@ -12,11 +12,14 @@ import FilePlayer from "./Players/FilePlayer.tsx";
 import {VideoStatus} from "../Constants/constants.tsx";
 import {IQueue} from "../Interfaces/IQueue.tsx";
 import StreamUrl from "../Models/StreamUrl.tsx";
-import {StreamType} from "../Models/Enums/StreamType.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
-    const [getRoom, setGetRoom] = useState<GetRoomResponse>();
+    const [roomStatus, setRoomStatus] = useState<VideoStatus>();
+    const [currentTime, setCurrentTime] = useState<number>();
+    const [queue, setQueue] = useState<Array<IQueue>>([]);
+    const [streamUrls, setStreamUrls] = useState<Array<StreamUrl>>([]);
+    const [users, setUsers] = useState<string[]>([]);
     const [loadState, setLoadState] = useState(0);
     /*
     State:
@@ -34,7 +37,12 @@ export default function RoomBody(params: {roomId: string}) {
                     if (!ignore) {
                         if (response.status == 200) {
                             response.json().then(json => {
-                                setGetRoom(json as GetRoomResponse);
+                                const parsed = json as GetRoomResponse;
+                                setRoomStatus(parsed.Room.Status);
+                                setCurrentTime(parsed.Room.CurrentTime);
+                                setQueue(parsed.Room.Queue);
+                                setStreamUrls(parsed.Room.StreamUrls);
+                                setUsers(parsed.Users);
                                 setLoadState(2);
                             })
                         } else {
@@ -59,41 +67,12 @@ export default function RoomBody(params: {roomId: string}) {
     }, [params.roomId, hub]);
 
 
-    const handleCurrentVideoChanged = (streamUrls) => {
-        const newUrls : StreamUrl[] = streamUrls.map(streamUrl => {
-            return {
-                Url : streamUrl.url,
-                StreamType: streamUrl.streamType
-            } as StreamUrl
-        });
-        return newUrls;
-    }
-
-
     useEffect(() => {
-        const handleVideoFinished = (newRoomData) => {
-            const newItems : IQueue[] = newRoomData.room.queue.map(queueItem => {
-                return {
-                    Title : queueItem.title,
-                    ThumbnailLocation : queueItem.thumbnailLocation,
-                    Order : queueItem.order,
-                    Id : queueItem.id,
-                    Type : queueItem.type
-                } as IQueue
-            });
-            setGetRoom(previousRoom => {
-                if (!previousRoom) return previousRoom;
-                return {
-                    ...previousRoom,
-                    Room: {
-                        ...previousRoom.Room,
-                        Status: VideoStatus.Playing,
-                        CurrentTime: 0,
-                        Queue: newItems,
-                        StreamUrls: handleCurrentVideoChanged(newRoomData.room.streamUrls)
-                    }
-                } as GetRoomResponse;
-            });
+        const handleVideoFinished = (room: {streamUrls : StreamUrl[], queue : IQueue[]}) => {
+            setStreamUrls(room.streamUrls);
+            setRoomStatus(VideoStatus.Playing);
+            setCurrentTime(0);
+            setQueueItems(room.queue);
         };
 
         hub.on("VideoFinished", handleVideoFinished);
@@ -105,42 +84,42 @@ export default function RoomBody(params: {roomId: string}) {
     }, [hub]); // Remove getRoom from dependencies to avoid stale closures
 
     useEffect(() => {
-        const handleVideoChanged = (streamUrls : {url : string, streamType : StreamType}[]) => {
-            setGetRoom(previousRoom => {
-                if (!previousRoom) return previousRoom;
-                return {
-                    ...previousRoom,
-                    Room: {
-                        ...previousRoom.Room,
-                        Status: VideoStatus.Playing,
-                        CurrentTime: 0,
-                        StreamUrls: handleCurrentVideoChanged(streamUrls)
-                    }
-                } as GetRoomResponse;
-            });
+        const handleVideoChanged = (streamUrls : StreamUrl[]) => {
+            setStreamUrls(streamUrls);
+            setRoomStatus(VideoStatus.Playing);
+            setCurrentTime(0);
         };
 
         hub.on("VideoChanged", handleVideoChanged)
+
+        hub.on("LoadVideo", (urlsOfNextVideo: Array<StreamUrl>) => {
+            if (urlsOfNextVideo.length > 0) {
+                setStreamUrls(urlsOfNextVideo);
+            }
+        });
 
         return () => {
             hub.off("VideoChanged", handleVideoChanged)
         }
     }, [hub])
 
+    function setQueueItems(queue1 : IQueue[]) {
+        setQueue(queue1);
+    }
 
     function LoadedState() {
         return <RoomContext.Provider value={params.roomId}>
             <div className={"flex w-full"}>
                 <div className={"flex-auto w-1/6 bg-red-500"}>
-                    <Queue queueItems={getRoom.Room.Queue} />
+                    <Queue queueItems={queue} setQueueItems={(queueItems) => setQueueItems(queueItems)} />
                 </div>
                 <div className={"flex-auto w-4/6 bg-yellow-500"}>
-                    {getRoom?.Room.Queue && getRoom?.Room.Queue.length > 0 ?
-                        <FilePlayer videoId={getRoom?.Room.Queue.find(queue => queue.Order == 0)?.Id} streamUrls={getRoom?.Room.StreamUrls} autoplay={getRoom?.Room.Status == VideoStatus.Playing} startTime={getRoom?.Room.CurrentTime}/>
+                    {(queue && queue.length > 0) && (streamUrls && streamUrls.length > 0) ?
+                        <FilePlayer videoId={queue.find(queue => queue.Order == 0)?.Id} streamUrls={streamUrls} autoplay={roomStatus == VideoStatus.Playing} startTime={currentTime}/>
                         : <></>}
                 </div>
                 <div className={"flex-auto w-1/6 bg-blue-500"}>
-                    <Users users={getRoom.Users}/>
+                    <Users users={users}/>
                 </div>
             </div>
         </RoomContext.Provider>
