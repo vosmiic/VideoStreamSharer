@@ -1,8 +1,8 @@
-import {useContext, useEffect, useState} from "react";
+import {useContext, useEffect, useMemo, useState} from "react";
 import * as apiCalls from "../Helpers/ApiCalls.tsx";
 import NotFound from "./NotFound.tsx";
 import Loading from "./Loading.tsx";
-import {GetRoomResponse, IRoom} from "../Interfaces/IRoom.tsx";
+import {GetRoomResponse} from "../Interfaces/IRoom.tsx";
 import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
@@ -20,6 +20,7 @@ export default function RoomBody(params: {roomId: string}) {
     const [queue, setQueue] = useState<Array<IQueue>>([]);
     const [streamUrls, setStreamUrls] = useState<Array<StreamUrl>>([]);
     const [users, setUsers] = useState<string[]>([]);
+    const filePlayer = useMemo(() => <FilePlayer videoId={queue.find(queue => queue.Order == 0)?.Id} streamUrls={streamUrls} autoplay={roomStatus == VideoStatus.Playing} startTime={currentTime}/>, [currentTime, roomStatus, streamUrls]);
     const [loadState, setLoadState] = useState(0);
     /*
     State:
@@ -40,7 +41,7 @@ export default function RoomBody(params: {roomId: string}) {
                                 const parsed = json as GetRoomResponse;
                                 setRoomStatus(parsed.Room.Status);
                                 setCurrentTime(parsed.Room.CurrentTime);
-                                setQueue(parsed.Room.Queue);
+                                setQueueItems(parsed.Room.Queue);
                                 setStreamUrls(parsed.Room.StreamUrls);
                                 setUsers(parsed.Users);
                                 setLoadState(2);
@@ -103,8 +104,8 @@ export default function RoomBody(params: {roomId: string}) {
         }
     }, [hub])
 
-    function setQueueItems(queue1 : IQueue[]) {
-        setQueue(queue1);
+    function setQueueItems(newQueue : IQueue[]) {
+        setQueue(newQueue);
     }
 
     function LoadedState() {
@@ -114,8 +115,8 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={queue} setQueueItems={(queueItems) => setQueueItems(queueItems)} />
                 </div>
                 <div className={"flex-auto w-4/6 bg-yellow-500"}>
-                    {(queue && queue.length > 0) && (streamUrls && streamUrls.length > 0) ?
-                        <FilePlayer videoId={queue.find(queue => queue.Order == 0)?.Id} streamUrls={streamUrls} autoplay={roomStatus == VideoStatus.Playing} startTime={currentTime}/>
+                    {queue && (streamUrls && streamUrls.length > 0) ?
+                        filePlayer
                         : <></>}
                 </div>
                 <div className={"flex-auto w-1/6 bg-blue-500"}>
