@@ -1,4 +1,4 @@
-import {useContext, useEffect, useRef} from "react";
+import {useCallback, useContext, useEffect, useRef, useState} from "react";
 import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
@@ -51,9 +51,9 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
         }
     });
 
-    function updateRoomTime(skipCounter: boolean) {
+    const updateRoomTime = useCallback((skipCounter: boolean) =>  {
         hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
-    }
+    }, [hub]);
 
     useEffect(() => {
         syncControl();
@@ -144,7 +144,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
                 }
             }, 1000);
         }
-    }, [hub]);
+    }, [hub, params.videoId, updateRoomTime]);
 
     function changeVolume(newVolume : number) {
         const paused = !audioPlayerRef.current.paused && videoPlayerRef.current.paused; // covers odd behavior where audio plays automatically when changing volume

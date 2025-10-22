@@ -18,9 +18,10 @@ export default function RoomBody(params: {roomId: string}) {
     const [roomStatus, setRoomStatus] = useState<VideoStatus>();
     const [currentTime, setCurrentTime] = useState<number>();
     const [queue, setQueue] = useState<Array<IQueue>>([]);
+    const [currentVideoId, setCurrentVideoId] = useState<string>();
     const [streamUrls, setStreamUrls] = useState<Array<StreamUrl>>([]);
     const [users, setUsers] = useState<string[]>([]);
-    const filePlayer = useMemo(() => <FilePlayer videoId={queue.find(queue => queue.Order == 0)?.Id} streamUrls={streamUrls} autoplay={roomStatus == VideoStatus.Playing} startTime={currentTime}/>, [currentTime, roomStatus, streamUrls]);
+    const filePlayer = useMemo(() => <FilePlayer videoId={currentVideoId} streamUrls={streamUrls} autoplay={roomStatus == VideoStatus.Playing} startTime={currentTime}/>, [currentTime, currentVideoId, roomStatus, streamUrls]);
     const [loadState, setLoadState] = useState(0);
     /*
     State:
@@ -105,6 +106,11 @@ export default function RoomBody(params: {roomId: string}) {
     }, [hub])
 
     function setQueueItems(newQueue : IQueue[]) {
+        var videoId = newQueue.find(queue => queue.Order == 0)?.Id;
+        if (!currentVideoId || currentVideoId != videoId) {
+            console.log(`Setting current video ID to ${videoId}`);
+            setCurrentVideoId(videoId);
+        }
         setQueue(newQueue);
     }
 
@@ -115,7 +121,7 @@ export default function RoomBody(params: {roomId: string}) {
                     <Queue queueItems={queue} setQueueItems={(queueItems) => setQueueItems(queueItems)} />
                 </div>
                 <div className={"flex-auto w-4/6 bg-yellow-500"}>
-                    {queue && (streamUrls && streamUrls.length > 0) ?
+                    {currentVideoId && (streamUrls && streamUrls.length > 0) ?
                         filePlayer
                         : <></>}
                 </div>
