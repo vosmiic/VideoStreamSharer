@@ -8,4 +8,5 @@ public class RedisKeys {
     public static string RoomCurrentTimeField() => "current-time";
     public static string RoomUpdateTimeCounterField() => "update-time-counter";
     public static string RoomCurrentLeaderConnectionIdField() => "current-leader-connection-id";
+    public static string RoomCurrentStatus() => "current-status";
 }

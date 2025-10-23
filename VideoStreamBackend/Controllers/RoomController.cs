@@ -51,13 +51,15 @@ public class RoomController : Controller {
 
         var redisCurrentTime = _redis.HashGet(roomId.ToString(), RedisKeys.RoomCurrentTimeField());
         double currentTime = redisCurrentTime != RedisValue.Null && redisCurrentTime.TryParse(out double time) ? time : room.CurrentTime;
+        RedisValue storedRoomStatus = _redis.HashGet(room.StringifiedId, RedisKeys.RoomCurrentStatus());
+        Status roomStatus = storedRoomStatus == RedisValue.Null ? Status.Paused : Enum.Parse<Status>(storedRoomStatus.ToString());
         
         return Ok(new GetRoomResponse {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
                 StreamUrls = room.CurrentVideo() != null ? await RoomHelper.GetStreamUrls(_redis, Request, room) : null,
-                Status = room.Status,
+                Status = roomStatus,
                 CurrentTime = currentTime,
                 Queue = RoomHelper.GetQueueModel(room, Request)
             },

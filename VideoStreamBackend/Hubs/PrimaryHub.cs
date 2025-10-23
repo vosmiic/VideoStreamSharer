@@ -98,23 +98,6 @@ public class PrimaryHub : Hub {
         }
         await base.OnConnectedAsync();
     }
-    
-    [AllowAnonymous]
-    public async Task StatusChange(Status status) {
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        Room? room = await _roomService.GetRoomById(roomId);
-        if (room == null || room.Status == status) return;
-        try {
-            room.Status = status;
-            await _roomService.SaveChanges();
-        } catch (Exception) {
-            // todo log the error here
-            await Clients.Client(Context.ConnectionId).SendAsync(StatusChangeMethod, Context.ConnectionId);
-            return;
-        }
-
-        await Clients.Group(roomId.ToString()).SendAsync(StatusChangeMethod, status);
-    }
 
     [AllowAnonymous]
     public async Task UpdateRoomTime(double time, bool skipCounter) {
@@ -179,8 +162,7 @@ public class PrimaryHub : Hub {
         var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
         Room? room = await _roomService.GetRoomById(roomId);
         if (room == null) return;
-        room.Status = status;
-        await _roomService.SaveChanges();
+        _redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentStatus(), (int)status);
         QueueItem? currentVideo = room?.CurrentVideo();
         if (currentVideo == null) return;
         string? method = null;
