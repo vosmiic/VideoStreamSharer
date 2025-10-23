@@ -32,6 +32,11 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
             setInterval(() => {
                 if (videoPlayerRef.current && videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
                     updateRoomTime(false);
+                    if (audioPlayerRef.current?.paused) {
+                        audioPlayerRef.current.play().catch(() => {
+                            // ignore errors caused by this so we don't fill the console
+                        })
+                    }
                 }
             }, 1000);
 
