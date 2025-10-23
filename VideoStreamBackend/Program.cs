@@ -39,6 +39,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IQueueItemService, QueueItemService>();
 
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1000 * 1024 * 1024);
+
 var app = builder.Build();
 
 app.MapIdentityApi<ApplicationUser>();
