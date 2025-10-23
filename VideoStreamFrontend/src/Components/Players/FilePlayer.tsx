@@ -3,7 +3,12 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 
-export default function FilePlayer(params: { videoId: string, streamUrls: Array<StreamUrl>, autoplay: boolean, startTime: number }) {
+export default function FilePlayer(params: {
+    videoId: string,
+    streamUrls: Array<StreamUrl>,
+    autoplay: boolean,
+    startTime: number
+}) {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>();
     const audioPlayerRef = useRef<HTMLAudioElement>();
@@ -47,6 +52,13 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
             audioPlayerRef.current.addEventListener("loadedmetadata", () => {
                 audioPlayerRef.current.currentTime = params.startTime;
                 audioPlayerRef.current.muted = false;
+                cookieStore.get("volume").then((cookie) => {
+                    if (cookie) {
+                        console.log(`setting volume ${cookie.value} from cookie`);
+                        audioPlayerRef.current.volume = cookie.value;
+                        document.getElementById("volumeSlider").value = cookie.value * 100;
+                    }
+                });
             })
 
             audioPlayerRef.current.addEventListener("play", () => {
@@ -56,7 +68,7 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
         }
     });
 
-    const updateRoomTime = useCallback((skipCounter: boolean) =>  {
+    const updateRoomTime = useCallback((skipCounter: boolean) => {
         hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
     }, [hub]);
 
@@ -151,23 +163,24 @@ export default function FilePlayer(params: { videoId: string, streamUrls: Array<
         }
     }, [hub, params.videoId, updateRoomTime]);
 
-    function changeVolume(newVolume : number) {
+    function changeVolume(newVolume: number) {
+        const scaledVolume = newVolume / 100;
         const paused = !audioPlayerRef.current.paused && videoPlayerRef.current.paused; // covers odd behavior where audio plays automatically when changing volume
-        audioPlayerRef.current.volume = newVolume;
+        audioPlayerRef.current.volume = scaledVolume;
         audioPlayerRef.current.muted = false;
-        document.cookie = `volume=${newVolume}; Path=/room`;
+        cookieStore.set("volume", scaledVolume.toString());
         if (paused)
             audioPlayerRef.current.pause();
     }
 
 
     return <div id="player">
-            <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
-                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url} />
-            </video>
-            <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
-                <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url} />
-            </audio>
-            <input type={"range"} onChange={(element) => changeVolume(element.target.value / 100)}/>
-        </div>
+        <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
+            <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url}/>
+        </video>
+        <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
+            <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>
+        </audio>
+        <input type={"range"} id={"volumeSlider"} onChange={(element) => changeVolume(element.target.value)}/>
+    </div>
 }
