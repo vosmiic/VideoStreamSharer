@@ -106,11 +106,9 @@ export default function RoomBody(params: {roomId: string}) {
     }, [hub])
 
     function setQueueItems(newQueue : IQueue[]) {
-        var videoId = newQueue.find(queue => queue.Order == 0)?.Id;
-        if (!currentVideoId || currentVideoId != videoId) {
-            console.log(`Setting current video ID to ${videoId}`);
+        const videoId = newQueue.find(queue => queue.Order == 0)?.Id;
+        if (videoId)
             setCurrentVideoId(videoId);
-        }
         setQueue(newQueue);
     }
 
