@@ -72,6 +72,55 @@ export default function FilePlayer(params: {
         hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
     }, [hub]);
 
+    function onPlay(event : Event) {
+        console.log("play")
+        console.log(videoPlayerRef.current.seeking)
+        if (!videoPlayerRef.current.seeking) {
+            audioPlayerRef.current.play().catch((error) => {
+                console.log("cant play audio, muting", error)
+                audioPlayerRef.current.volume = 0;
+                audioPlayerRef.current.play();
+            });
+            if (event.isTrusted)
+                hub.send("PlayVideo");
+        }
+    }
+
+    function onPause(event : Event) {
+        console.log("pause");
+        console.log(event.isTrusted);
+        audioPlayerRef.current.pause();
+        if (event.isTrusted)
+            hub.send("PauseVideo");
+    }
+
+    function onSeeked() {
+        console.log("seeked")
+        audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+        audioPlayerRef.current.play().catch(() => {
+            audioPlayerRef.current.volume = 0;
+            audioPlayerRef.current.play();
+        });
+        // forcibly update room time
+        updateRoomTime(true);
+    }
+
+    function onRateChange() {
+        console.log("ratechange")
+        audioPlayerRef.current.playbackRate = videoPlayerRef.current.playbackRate;
+    }
+
+    function onSeeking() {
+        console.log("seeking")
+        audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+        audioPlayerRef.current.pause();
+    }
+
+    function onEnded() {
+        console.log("ended");
+        hub.send("FinishedVideo", params.videoId);
+    }
+
     useEffect(() => {
         syncControl();
 
@@ -104,54 +153,6 @@ export default function FilePlayer(params: {
         });
 
         function syncControl() {
-            videoPlayerRef.current.addEventListener("play", (event) => {
-                console.log("play")
-                console.log(videoPlayerRef.current.seeking)
-                if (!videoPlayerRef.current.seeking) {
-                    audioPlayerRef.current.play().catch((error) => {
-                        console.log("cant play audio, muting", error)
-                        audioPlayerRef.current.volume = 0;
-                        audioPlayerRef.current.play();
-                    });
-                    if (event.isTrusted)
-                        hub.send("PlayVideo");
-                }
-            });
-
-            videoPlayerRef.current.addEventListener("pause", (event) => {
-                console.log("pause");
-                audioPlayerRef.current.pause();
-                if (event.isTrusted)
-                    hub.send("PauseVideo");
-            });
-
-            videoPlayerRef.current.addEventListener("seeked", () => {
-                console.log("seeked")
-                audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
-                audioPlayerRef.current.play().catch(() => {
-                    audioPlayerRef.current.volume = 0;
-                    audioPlayerRef.current.play();
-                });
-                // forcibly update room time
-                updateRoomTime(true);
-            });
-
-            videoPlayerRef.current.addEventListener("ratechange", () => {
-                console.log("ratechange")
-                audioPlayerRef.current.playbackRate = videoPlayerRef.current.playbackRate;
-            });
-
-            videoPlayerRef.current.addEventListener("seeking", () => {
-                console.log("seeking")
-                audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
-                audioPlayerRef.current.pause();
-            });
-
-            videoPlayerRef.current.addEventListener("ended", () => {
-                console.log("ended");
-                hub.send("FinishedVideo", params.videoId);
-            })
-
             setInterval(() => {
                 if (videoPlayerRef.current && audioPlayerRef.current && (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
                     audioPlayerRef.current.currentTime != videoPlayerRef.current.currentTime &&
@@ -175,7 +176,18 @@ export default function FilePlayer(params: {
 
 
     return <div id="player">
-        <video ref={videoPlayerRef} className={"min-w-full"} controls={true} preload={"auto"} muted={true}>
+        <video ref={videoPlayerRef}
+               className={"min-w-full"}
+               controls={true}
+               preload={"auto"}
+               muted={true}
+               onPlay={(event) => onPlay(event.nativeEvent)}
+               onPause={(event) => onPause(event.nativeEvent)}
+               onSeeked={onSeeked}
+               onRateChange={onRateChange}
+               onSeeking={onSeeking}
+               onEnded={onEnded}
+        >
             <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url}/>
         </video>
         <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
