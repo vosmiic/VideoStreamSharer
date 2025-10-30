@@ -47,20 +47,9 @@ public class PrimaryHub : Hub {
         string roomConnectionKey = RedisKeys.RoomConnectionsKey(parsedRoomId);
         string? username = _redis.HashGet(roomConnectionKey, Context.ConnectionId);
         _redis.HashDelete(roomConnectionKey, Context.ConnectionId);
-        RedisValue currentLeader = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
-        HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
-        if (currentLeader != RedisValue.Null && currentLeader == Context.ConnectionId) {
-            // remove leader
-            _redis.HashDelete(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
-            // and assign a new leader
-            var firstUser = connections.FirstOrDefault().Name;
-            if (firstUser != RedisValue.Null)
-                _redis.HashSet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField(), firstUser);
-        }
+        UsersHelper.ChangeLeader(new Room{Id = parsedRoomId}, _redis);
         if (username != null) {
-            foreach (HashEntry connection in connections) {
-                await Clients.Client(connection.Name).SendAsync("RemoveUser", username);
-            }
+            await Clients.Group(roomId).SendAsync("RemoveUser", username);
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -106,9 +95,15 @@ public class PrimaryHub : Hub {
         if (!skipCounter) {
             if (!LeadershipCheck(roomId))
                 return;
+            }
         }
         if (!_redis.KeyExists(roomId) || !Guid.TryParse(roomId, out Guid parsedRoomId)) return;
-        await Clients.Group(roomId).SendAsync(TimeUpdateMethod, time);
+        var roomCurrentStatus = _redis.HashGet(roomId, RedisKeys.RoomCurrentStatus());
+        if (roomCurrentStatus != RedisValue.Null) {
+            await Clients.Group(roomId).SendAsync(TimeUpdateMethod, time, (int)roomCurrentStatus); // don't need to parse to status
+        } else {
+            await Clients.Group(roomId).SendAsync(TimeUpdateMethod, time);
+        }
         long counter = 0;
         if (!skipCounter) {
             counter = _redis.HashIncrement(roomId, RedisKeys.RoomUpdateTimeCounterField());
@@ -159,12 +154,19 @@ public class PrimaryHub : Hub {
     }
 
     private async Task StatusUpdate(Status status) {
-        var roomId = Guid.Parse(Context.GetHttpContext().Request.Query["roomId"]);
-        Room? room = await _roomService.GetRoomById(roomId);
-        if (room == null) return;
-        _redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentStatus(), (int)status);
-        QueueItem? currentVideo = room?.CurrentVideo();
-        if (currentVideo == null) return;
+        var roomId = Context.GetHttpContext().Request.Query["roomId"].ToString();
+        bool leaderExists = _redis.HashExists(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+        if (!leaderExists) return; // leader must exist in a room, otherwise room doesn't exist or no users are active (either way user shouldn't be allowed to update room status)
+        if (_redis.HashExists(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId)) {
+            // User is attempting to update status too often
+            Console.WriteLine($"Too many status updates from connection {Context.ConnectionId}");
+            // Attempt to hand over leadership to someone else
+            UsersHelper.ChangeLeader(new Room{Id = Guid.Parse(roomId)}, _redis);
+            return;
+        }; 
+        _redis.HashSet(roomId, RedisKeys.RoomCurrentStatus(), (int)status);
+        _redis.HashSet(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId, RedisValue.EmptyString);
+        _redis.HashFieldExpire(RedisKeys.RoomStatusLockKey(roomId), [Context.ConnectionId], DateTime.UtcNow.AddMilliseconds(500));
         string? method = null;
         switch (status) {
             case Status.Playing:
@@ -174,8 +176,10 @@ public class PrimaryHub : Hub {
                 method = PauseVideoMethod;
                 break;
         }
-        if (method != null)
-            await Clients.Group(roomId.ToString()).SendAsync(method);
+
+        if (method != null) {
+            await Clients.Group(roomId).SendAsync(method);
+        }
     }
 
     private bool LeadershipCheck(string roomId) {

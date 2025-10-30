@@ -2,6 +2,7 @@ import {useCallback, useContext, useEffect, useRef, useState} from "react";
 import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
+import {VideoStatus} from "../../Constants/constants.tsx";
 
 export default function FilePlayer(params: {
     videoId: string,
@@ -12,6 +13,9 @@ export default function FilePlayer(params: {
     const hub = useContext(HubContext);
     const videoPlayerRef = useRef<HTMLVideoElement>();
     const audioPlayerRef = useRef<HTMLAudioElement>();
+    const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
+    const [audioLoaded, setAudioLoaded] = useState<boolean>(false);
+    const ignoreNextUpdate = useRef<boolean>(false);
 
     useEffect(() => {
         if (videoPlayerRef.current) {
@@ -35,7 +39,7 @@ export default function FilePlayer(params: {
             }
 
             setInterval(() => {
-                if (videoPlayerRef.current && videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+                if (videoPlayerRef.current && videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended && videoLoaded) {
                     updateRoomTime(false);
                     if (audioPlayerRef.current?.paused) {
                         audioPlayerRef.current.play().catch(() => {
@@ -47,9 +51,11 @@ export default function FilePlayer(params: {
 
             videoPlayerRef.current.addEventListener("loadedmetadata", () => {
                 videoPlayerRef.current.currentTime = params.startTime;
+                setVideoLoaded(true);
             });
 
             audioPlayerRef.current.addEventListener("loadedmetadata", () => {
+                setAudioLoaded(true);
                 audioPlayerRef.current.currentTime = params.startTime;
                 audioPlayerRef.current.muted = false;
                 cookieStore.get("volume").then((cookie) => {
@@ -81,17 +87,24 @@ export default function FilePlayer(params: {
                 audioPlayerRef.current.volume = 0;
                 audioPlayerRef.current.play();
             });
-            if (event.isTrusted)
+            if (event.isTrusted && !ignoreNextUpdate.current)
                 hub.send("PlayVideo");
+            if (ignoreNextUpdate.current) {
+                console.log("played from hub; not sending update to server");
+                ignoreNextUpdate.current = false;
+            }
         }
     }
 
     function onPause(event : Event) {
         console.log("pause");
-        console.log(event.isTrusted);
         audioPlayerRef.current.pause();
-        if (event.isTrusted)
+        if (event.isTrusted && !ignoreNextUpdate.current)
             hub.send("PauseVideo");
+        if (ignoreNextUpdate.current) {
+            console.log("paused from hub; not sending update to server");
+            ignoreNextUpdate.current = false;
+        }
     }
 
     function onSeeked() {
@@ -126,6 +139,8 @@ export default function FilePlayer(params: {
 
         hub.on("PauseVideo", () => {
             if (!videoPlayerRef.current.paused) {
+                console.log("paused from hub");
+                ignoreNextUpdate.current = true;
                 videoPlayerRef.current.pause();
                 audioPlayerRef.current.pause();
             }
@@ -133,6 +148,8 @@ export default function FilePlayer(params: {
 
         hub.on("PlayVideo", () => {
             if (videoPlayerRef.current.paused) {
+                console.log("played from hub");
+                ignoreNextUpdate.current = true;
                 videoPlayerRef.current.play().catch(() => {
                     audioPlayerRef.current.volume = 0;
                     audioPlayerRef.current.play();
@@ -144,11 +161,32 @@ export default function FilePlayer(params: {
             }
         });
 
-        hub.on("TimeUpdate", (time: number) => {
+        hub.on("TimeUpdate", (time: number, status : number | undefined) => {
             if (videoPlayerRef.current.currentTime < time - 1 || videoPlayerRef.current.currentTime > time + 1) {
                 videoPlayerRef.current.currentTime = time;
                 audioPlayerRef.current.currentTime = time;
                 console.log("out of sync, seeking")
+            }
+            if (status) {
+                switch (status as VideoStatus) {
+                    case VideoStatus.Paused:
+                        if (!videoPlayerRef.current?.paused) {
+                            videoPlayerRef.current?.pause();
+                            audioPlayerRef.current?.pause();
+                        }
+                        break;
+                    case VideoStatus.Playing:
+                        if (videoPlayerRef.current?.paused) {
+                            videoPlayerRef.current?.play().catch(() => {
+                                audioPlayerRef.current.volume = 0;
+                                audioPlayerRef.current?.play();
+                            });
+                            audioPlayerRef.current?.play().catch(() => {
+                                audioPlayerRef.current.volume = 0;
+                                audioPlayerRef.current?.play();
+                            });                        }
+                        break;
+                }
             }
         });
 
