@@ -93,7 +93,14 @@ public class PrimaryHub : Hub {
         string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
         if (roomId == null) return;
         if (!skipCounter) {
-            if (!LeadershipCheck(roomId))
+            if (!LeadershipCheck(roomId)) {
+                // keep non-leader users in sync
+                var status = _redis.HashGet(roomId, RedisKeys.RoomCurrentStatus());
+                if (status != RedisValue.Null && Enum.TryParse(status, out Status parsedStatus)) {
+                    string? stringifiedStatus = GetStatusMethod(parsedStatus);
+                    if (stringifiedStatus != null)
+                        await Clients.Client(Context.ConnectionId).SendAsync(stringifiedStatus);
+                }
                 return;
             }
         }
@@ -167,15 +174,7 @@ public class PrimaryHub : Hub {
         _redis.HashSet(roomId, RedisKeys.RoomCurrentStatus(), (int)status);
         _redis.HashSet(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId, RedisValue.EmptyString);
         _redis.HashFieldExpire(RedisKeys.RoomStatusLockKey(roomId), [Context.ConnectionId], DateTime.UtcNow.AddMilliseconds(500));
-        string? method = null;
-        switch (status) {
-            case Status.Playing:
-                method = PlayVideoMethod;
-                break;
-            case Status.Paused:
-                method = PauseVideoMethod;
-                break;
-        }
+        string? method = GetStatusMethod(status);
 
         if (method != null) {
             await Clients.Group(roomId).SendAsync(method);
@@ -187,5 +186,15 @@ public class PrimaryHub : Hub {
         if (leaderConnectionId == RedisValue.Null || Context.ConnectionId != leaderConnectionId)
             return false;
         return true;
+    }
+
+    private string? GetStatusMethod(Status status) {
+        switch (status) {
+            case Status.Playing:
+                return PlayVideoMethod;
+            case Status.Paused:
+                return PauseVideoMethod;
+        }
+        return null;
     }
 }
