@@ -75,8 +75,8 @@ public class PrimaryHub : Hub {
 
         string roomConnectionKey = RedisKeys.RoomConnectionsKey(parsedRoomId);
         _redis.HashSet(roomConnectionKey, Context.ConnectionId, username);
-        RedisValue currentLeader = _redis.HashGet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
-        if (currentLeader == RedisValue.Null || !_redis.HashExists(roomConnectionKey, currentLeader)) {
+        bool leaderExists = _redis.HashExists(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField());
+        if (!leaderExists) {
             // no leader so set the current user to be the leader
             _redis.HashSet(roomId, RedisKeys.RoomCurrentLeaderConnectionIdField(), Context.ConnectionId);
         }
