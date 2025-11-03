@@ -41,6 +41,8 @@ builder.Services.AddScoped<IQueueItemService, QueueItemService>();
 
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1000 * 1024 * 1024);
 
+builder.Services.AddLogging(logging => logging.AddSimpleConsole(loggingBuilder => loggingBuilder.TimestampFormat = "[HH:mm:ss.FFF] "));
+
 var app = builder.Build();
 
 app.MapIdentityApi<ApplicationUser>();
