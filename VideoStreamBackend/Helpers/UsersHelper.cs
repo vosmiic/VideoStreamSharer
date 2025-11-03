@@ -9,6 +9,7 @@ public class UsersHelper {
         RedisValue currentLeader = redis.HashGet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField());
         var connections = redis.HashGetAll(RedisKeys.RoomConnectionsKey(room.Id));
         var newLeader = connections.FirstOrDefault(entry => entry.Value != currentLeader);
-        redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField(), newLeader.Value);
+        if (newLeader != default)
+            redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField(), newLeader.Value);
     }
 }
