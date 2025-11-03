@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 using VideoStreamBackend.Helpers;
 using VideoStreamBackend.Models;
-using VideoStreamBackend.Models.ApiModels;
 using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
 
@@ -15,6 +14,7 @@ public class PrimaryHub : Hub {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IRoomService _roomService;
     private readonly IQueueItemService _queueItemService;
+    private readonly ILogger<PrimaryHub> _logger;
 
     #region HubMethods
 
@@ -32,11 +32,12 @@ public class PrimaryHub : Hub {
 
     #endregion
 
-    public PrimaryHub(IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService) {
+    public PrimaryHub(IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService, ILogger<PrimaryHub> logger) {
         _redis = connectionMultiplexer.GetDatabase();
         _userManager = userManager;
         _roomService = roomService;
         _queueItemService = queueItemService;
+        _logger = logger;
     }
     
     public override async Task OnDisconnectedAsync(Exception? exception) {
@@ -166,14 +167,15 @@ public class PrimaryHub : Hub {
         if (!leaderExists) return; // leader must exist in a room, otherwise room doesn't exist or no users are active (either way user shouldn't be allowed to update room status)
         if (_redis.HashExists(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId)) {
             // User is attempting to update status too often
-            Console.WriteLine($"Too many status updates from connection {Context.ConnectionId}");
+            _logger.LogInformation($"Too many status updates from connection {Context.ConnectionId}; status: {status}");
             // Attempt to hand over leadership to someone else
             UsersHelper.ChangeLeader(new Room{Id = Guid.Parse(roomId)}, _redis);
             return;
-        }; 
+        }
+        _logger.LogInformation($"Accepted status update from connection {Context.ConnectionId}; status: {status}");
         _redis.HashSet(roomId, RedisKeys.RoomCurrentStatus(), (int)status);
         _redis.HashSet(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId, RedisValue.EmptyString);
-        _redis.HashFieldExpire(RedisKeys.RoomStatusLockKey(roomId), [Context.ConnectionId], DateTime.UtcNow.AddMilliseconds(500));
+        _redis.HashFieldExpire(RedisKeys.RoomStatusLockKey(roomId), [Context.ConnectionId], DateTime.UtcNow.AddMilliseconds(250));
         string? method = GetStatusMethod(status);
 
         if (method != null) {
