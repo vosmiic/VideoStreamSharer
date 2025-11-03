@@ -61,6 +61,9 @@ public class QueueController : Controller {
         room.Queue.Add(video);
         await _roomService.SaveChanges();
         await _primaryHubContext.Clients.Group(roomId.ToString()).SendAsync(PrimaryHub.QueueAdded, video);
+        if (video.Order == 0)
+            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(_redis, Request, room));
+
         /* Old youtube solution
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
 
