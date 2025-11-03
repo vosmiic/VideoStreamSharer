@@ -126,7 +126,6 @@ export default function FilePlayer(params: {
     function onSeeking() {
         console.log("seeking")
         audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
-        audioPlayerRef.current.pause();
     }
 
     function onEnded() {
@@ -171,12 +170,14 @@ export default function FilePlayer(params: {
                 switch (status as VideoStatus) {
                     case VideoStatus.Paused:
                         if (!videoPlayerRef.current?.paused) {
+                            ignoreNextUpdate.current = true;
                             videoPlayerRef.current?.pause();
                             audioPlayerRef.current?.pause();
                         }
                         break;
                     case VideoStatus.Playing:
                         if (videoPlayerRef.current?.paused) {
+                            ignoreNextUpdate.current = true;
                             videoPlayerRef.current?.play().catch(() => {
                                 audioPlayerRef.current.volume = 0;
                                 audioPlayerRef.current?.play();
