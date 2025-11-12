@@ -12,6 +12,7 @@ import FilePlayer from "./Players/FilePlayer.tsx";
 import {VideoStatus} from "../Constants/constants.tsx";
 import {IQueue} from "../Interfaces/IQueue.tsx";
 import StreamUrl from "../Models/StreamUrl.tsx";
+import RoomRightPanel from "./RoomRightPanel.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -124,7 +125,7 @@ export default function RoomBody(params: {roomId: string}) {
                         : <></>}
                 </div>
                 <div className={"flex-auto w-1/6 bg-blue-500"}>
-                    <Users users={users}/>
+                    <RoomRightPanel users={users}/>
                 </div>
             </div>
         </RoomContext.Provider>

@@ -3,6 +3,7 @@ import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 import {VideoStatus} from "../../Constants/constants.tsx";
+import Hls from "hls.js";
 
 export default function FilePlayer(params: {
     videoId: string,
@@ -16,12 +17,15 @@ export default function FilePlayer(params: {
     const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
     const [audioLoaded, setAudioLoaded] = useState<boolean>(false);
     const ignoreNextUpdate = useRef<boolean>(false);
+    const hlsRef = useRef<Hls | null>(null);
 
     useEffect(() => {
+        // getVideoSource();
+
         if (videoPlayerRef.current) {
             if (params.autoplay) {
-                videoPlayerRef.current.load();
-                audioPlayerRef.current.load();
+                // videoPlayerRef.current.load();
+                // audioPlayerRef.current.load();
 
                 videoPlayerRef.current.play().catch(() => {
                     audioPlayerRef.current.volume = 0;
@@ -213,12 +217,37 @@ export default function FilePlayer(params: {
             audioPlayerRef.current.pause();
     }
 
+    // function getVideoSource() {
+    //     const url = params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url;
+    //     if (!url) return;
+    //     const mediaSource = new MediaSource();
+    //     videoSource.current = URL.createObjectURL(mediaSource);
+    //     console.log(videoSource.current);
+    //     console.log(url);
+    //
+    //     mediaSource.addEventListener('sourceopen', async () => {
+    //         const sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.640020, mp4a.40.2"');
+    //
+    //         // Fetch with custom headers
+    //         const response = await fetch(url);
+    //
+    //         const videoData = await response.arrayBuffer();
+    //         sourceBuffer.appendBuffer(videoData);
+    //
+    //         sourceBuffer.addEventListener('updateend', () => {
+    //             if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
+    //                 mediaSource.endOfStream();
+    //             }
+    //         });
+    //     });
+    // }
+
 
     return <div id="player">
         <video ref={videoPlayerRef}
                className={"min-w-full"}
                controls={true}
-               preload={"auto"}
+               preload={"metadata"}
                muted={true}
                onPlay={(event) => onPlay(event.nativeEvent)}
                onPause={(event) => onPause(event.nativeEvent)}
@@ -229,7 +258,7 @@ export default function FilePlayer(params: {
         >
             <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url}/>
         </video>
-        <audio ref={audioPlayerRef} preload={"auto"} controls={true}>
+        <audio className={"hidden"} ref={audioPlayerRef} preload={"auto"} controls={true}>
             <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>
         </audio>
         <input type={"range"} id={"volumeSlider"} onChange={(element) => changeVolume(element.target.value)}/>
