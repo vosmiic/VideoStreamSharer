@@ -9,12 +9,11 @@ using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Hubs;
 
-public class PrimaryHub : Hub {
+public class PrimaryHub : BaseHub {
     private readonly IDatabase _redis;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IRoomService _roomService;
     private readonly IQueueItemService _queueItemService;
-    private readonly ILogger<PrimaryHub> _logger;
 
     #region HubMethods
 
@@ -32,12 +31,11 @@ public class PrimaryHub : Hub {
 
     #endregion
 
-    public PrimaryHub(IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService, ILogger<PrimaryHub> logger) {
+    public PrimaryHub(IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService, ILogger<PrimaryHub> logger) : base(logger) {
         _redis = connectionMultiplexer.GetDatabase();
         _userManager = userManager;
         _roomService = roomService;
         _queueItemService = queueItemService;
-        _logger = logger;
     }
     
     public override async Task OnDisconnectedAsync(Exception? exception) {
@@ -135,9 +133,15 @@ public class PrimaryHub : Hub {
     [AllowAnonymous]
     public async Task FinishedVideo(Guid videoId) {
         string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
-        if (roomId == null) return;
-        if (!LeadershipCheck(roomId))
+        if (roomId == null) {
+            LogInformation("Request query Room ID is null");
             return;
+        }
+
+        if (!LeadershipCheck(roomId)) {
+            LogInformation("Is not leader; ignoring request");
+            return;
+        }
         var parsedRoomId = Guid.Parse(roomId);
         Room? room = await _roomService.GetRoomById(parsedRoomId);
         if (room == null) return;
@@ -167,12 +171,12 @@ public class PrimaryHub : Hub {
         if (!leaderExists) return; // leader must exist in a room, otherwise room doesn't exist or no users are active (either way user shouldn't be allowed to update room status)
         if (_redis.HashExists(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId)) {
             // User is attempting to update status too often
-            _logger.LogInformation($"Too many status updates from connection {Context.ConnectionId}; status: {status}");
+            LogInformation($"Too many status updates; status: {status}");
             // Attempt to hand over leadership to someone else
             UsersHelper.ChangeLeader(new Room{Id = Guid.Parse(roomId)}, _redis);
             return;
         }
-        _logger.LogInformation($"Accepted status update from connection {Context.ConnectionId}; status: {status}");
+        LogInformation($"Accepted status update; status: {status}");
         _redis.HashSet(roomId, RedisKeys.RoomCurrentStatus(), (int)status);
         _redis.HashSet(RedisKeys.RoomStatusLockKey(roomId), Context.ConnectionId, RedisValue.EmptyString);
         _redis.HashFieldExpire(RedisKeys.RoomStatusLockKey(roomId), [Context.ConnectionId], DateTime.UtcNow.AddMilliseconds(250));

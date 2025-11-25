@@ -41,7 +41,10 @@ builder.Services.AddScoped<IQueueItemService, QueueItemService>();
 
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1000 * 1024 * 1024);
 
-builder.Services.AddLogging(logging => logging.AddSimpleConsole(loggingBuilder => loggingBuilder.TimestampFormat = "[HH:mm:ss.FFF] "));
+builder.Services.AddLogging(logging =>  {
+    logging.AddSimpleConsole(loggingBuilder => loggingBuilder.TimestampFormat = "[HH:mm:ss.FFF] ");
+    logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+});
 
 var app = builder.Build();
 
