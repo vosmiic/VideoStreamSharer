@@ -7,6 +7,7 @@ public class StreamUrl {
     /// Expiry in unix time seconds.
     /// </summary>
     public long Expiry { get; set; }
+    public VideoInfo.Protocol Protocol { get; set; }
 }
 
 public enum StreamType {

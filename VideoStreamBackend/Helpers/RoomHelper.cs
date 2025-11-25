@@ -47,10 +47,10 @@ public class RoomHelper {
             if (audioUrlFromRedis.HasValue) {
                 streamUrls.Add(JsonSerializer.Deserialize<StreamUrl>(audioUrlFromRedis.Value.ToString()));
             }
-        } else if (queueItem != null) {
+        } else if (queueItem is YouTubeVideo youtubeVideo) {
             // store the video in redis for others
             YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-            var result = await ytDlpHelper.GetVideoUrls(queueItem);
+            var result = await ytDlpHelper.GetVideoUrls(youtubeVideo);
             if (!result.success || result.urls == null) {
                 return streamUrls;
             }

@@ -36,7 +36,7 @@ public class YtDlpHelperTests {
                     FormatId = 1.ToString(),
                     Resolution = "1920x1080",
                     Quality = 1.0,
-                    FilesizeApprox = 123456789,
+                    Filesize = 123456789,
                     Protocol = VideoInfo.Protocol.https
                 }
             },
@@ -84,7 +84,8 @@ public class YtDlpHelperTests {
         
         YtDlpHelper ytDlpHelper = new YtDlpHelper(cliWrapper.Object);
         var result = await ytDlpHelper.GetVideoUrls(new YouTubeVideo {
-            VideoUrl = new Uri("https://test.com")
+            VideoUrl = new Uri("https://test.com"),
+            Protocol = VideoInfo.Protocol.https
         }, videoOutput, audioOutput);
         Assert.That(result.success, Is.True);
         Assert.That(result.urls, Is.Not.Empty);

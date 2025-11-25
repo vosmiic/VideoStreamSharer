@@ -49,38 +49,47 @@ public class YtDlpHelper {
         return (videoInfo, true, null);
     }
 
-    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(QueueItem queueItem) {
+    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(YouTubeVideo youtubeVideo) {
         (StringBuilder, StringBuilder) videoOutput = (new StringBuilder(), new StringBuilder());
         (StringBuilder, StringBuilder) audioOutput = (new StringBuilder(), new StringBuilder());
 
-        return await GetVideoUrls(queueItem, videoOutput, audioOutput);
+        return await GetVideoUrls(youtubeVideo, videoOutput, audioOutput);
     }
 
-    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(QueueItem queueItem,
+    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(YouTubeVideo youtubeVideo,
         (StringBuilder standardOutput, StringBuilder errorOutput) videoOutput,
         (StringBuilder standardOutput, StringBuilder errorOutput) audioOutput) {
-        YouTubeVideo? youtubeVideo = queueItem as YouTubeVideo;
         if (youtubeVideo == null) return (null, false, null); // todo handle uploaded videos
         string argument = $"-q -g \"{youtubeVideo.VideoUrl}\" -f";
-        var videoTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.VideoFormatId}\"", PipeTarget.ToStringBuilder(videoOutput.standardOutput), PipeTarget.ToStringBuilder(videoOutput.errorOutput));
-        var audioTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.AudioFormatId}\"", PipeTarget.ToStringBuilder(audioOutput.standardOutput), PipeTarget.ToStringBuilder(audioOutput.errorOutput));
-        var result = await Task.WhenAll(videoTask, audioTask);
+        List<Task<CommandResult>> jobs = new List<Task<CommandResult>>();
+        Task<CommandResult> videoTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.VideoFormatId}\"", PipeTarget.ToStringBuilder(videoOutput.standardOutput), PipeTarget.ToStringBuilder(videoOutput.errorOutput));
+        jobs.Add(videoTask);
+        bool getAudioUrl = youtubeVideo.Protocol != VideoInfo.Protocol.m3u8_native;
+        if (getAudioUrl) {
+            var audioTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.AudioFormatId}\"", PipeTarget.ToStringBuilder(audioOutput.standardOutput), PipeTarget.ToStringBuilder(audioOutput.errorOutput));
+            jobs.Add(audioTask);
+        }
+        var result = await Task.WhenAll(jobs);
         if (!result.All(cr => cr.IsSuccess)) return (null, false, $"Video error: {videoOutput.errorOutput}; Audio error: {audioOutput.errorOutput}");
         
         string videoUrl = videoOutput.standardOutput.ToString();
-        string audioUrl = audioOutput.standardOutput.ToString();
         List<StreamUrl> streamUrls = new List<StreamUrl> {
             new()  {
                 Url = videoUrl,
                 StreamType = StreamType.Video,
-                Expiry = GetExpiry(videoUrl)
-            },
-            new()  {
-                Url = audioUrl,
-                StreamType = StreamType.Audio,
-                Expiry = GetExpiry(audioUrl)
+                Expiry = GetExpiry(videoUrl),
+                Protocol = youtubeVideo.Protocol
             }
         };
+        if (getAudioUrl) {
+            string audioUrl = audioOutput.standardOutput.ToString();
+            streamUrls.Add(new()  {
+                Url = audioUrl,
+                StreamType = StreamType.Audio,
+                Expiry = GetExpiry(audioUrl),
+                Protocol = youtubeVideo.Protocol
+            });
+        }
         
         return (streamUrls, true, null);
     }

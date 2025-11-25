@@ -57,6 +57,7 @@ public class QueueController : Controller {
             AudioFormatId = data.AudioFormatId,
             ThumbnailLocation = info.videoInfo.Thumbnail,
             Order = room.Queue.Any() ? room.Queue.Max(queue => queue.Order) + 1 : 0,
+            Protocol = videoFormat.Protocol
         };
         room.Queue.Add(video);
         await _roomService.SaveChanges();
@@ -134,20 +135,20 @@ public class QueueController : Controller {
             AudioFormats = info.videoInfo.Formats
                 .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: true })
                 .OrderByDescending(stream => stream.Quality)
-                .ThenByDescending(stream => stream.FilesizeApprox)
+                .ThenByDescending(stream => stream.Filesize)
                 .DistinctBy(stream => stream.Resolution)
                 .Select(stream => new LookupModel.LookupFormats {
                     Id = stream.FormatId,
                     Value = stream.Quality.ToString("F1"),
                 }).OrderByDescending(format => format.Id),
             VideoFormats = info.videoInfo.Formats
-                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: false })
+                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: false } or { Protocol: VideoInfo.Protocol.m3u8_native, IsAudio: false})
                 .OrderByDescending(stream => stream.Quality)
-                .ThenByDescending(stream => stream.FilesizeApprox)
-                .DistinctBy(stream => stream.Resolution)
+                .ThenByDescending(stream => stream.Filesize)
+                .DistinctBy(stream => (stream.Resolution, stream.Protocol))
                 .Select(stream => new LookupModel.LookupFormats {
                     Id = stream.FormatId,
-                    Value = stream.Resolution,
+                    Value = $"{stream.Resolution}{(stream.Protocol == VideoInfo.Protocol.m3u8_native ? " M3U8" : String.Empty)}",
                 }).OrderByDescending(format => format.Id)
         };
 
@@ -247,8 +248,7 @@ public class QueueController : Controller {
             (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
             if (!videoInfo.success || videoInfo.videoInfo == null) return (null, videoInfo.error);
 
-            if (videoInfo.videoInfo.Formats.All(format => format.IsAudio && format.Protocol != VideoInfo.Protocol.https) ||
-                videoInfo.videoInfo.Formats.All(format => !format.IsAudio && format.Protocol != VideoInfo.Protocol.https)) {
+            if (videoInfo.videoInfo.Formats.Length == 0) {
                 // retry the request, sometimes the server provides odd results
                 counter++;
             } else {

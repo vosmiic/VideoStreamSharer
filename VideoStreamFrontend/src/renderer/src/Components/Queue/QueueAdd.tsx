@@ -15,6 +15,7 @@ export default function QueueAdd() {
     const [videoFormatId, setVideoFormatId] = useState<string>();
     const [audioFormatId, setAudioFormatId] = useState<string>();
     const [error, setError] = useState<string | null>();
+    const [streamSelected, setStreamSelected] = useState<boolean>(false);
     const modal = useRef<HTMLDialogElement>(null);
 
     async function handleOnLookup() {
@@ -45,7 +46,7 @@ export default function QueueAdd() {
         const queueAdd: IQueueAdd = {
             Url: input,
             VideoFormatId: videoFormatId,
-            AudioFormatId: audioFormatId
+            AudioFormatId: !videoFormatId?.endsWith("M3U8") ? audioFormatId : null
         }
         setAddingVideo(true);
         setError(null);
@@ -89,6 +90,16 @@ export default function QueueAdd() {
         setDisplayPreview(false);
     }
 
+    function handleOnVideoFormatChange(event : ChangeEvent<HTMLSelectElement>) {
+        const value = event.target.value;
+        setVideoFormatId(value);
+        if (value.endsWith("M3U8")) {
+            setStreamSelected(true);
+        } else {
+            setStreamSelected(false);
+        }
+    }
+
     return (<div>
         <div className={"w-full"}>
             <div className={"flex flex-row"}>
@@ -117,13 +128,13 @@ export default function QueueAdd() {
                                 </div>
                                 <div className={""}>
                                     <div>Video Format</div>
-                                    <select value={videoFormatId} onChange={e => setVideoFormatId(e.target.value)}>
+                                    <select value={videoFormatId} onChange={e => handleOnVideoFormatChange(e)}>
                                         {lookup?.VideoFormats.map(format => (
                                             <option key={format.Id} value={format.Id}>{format.Value}</option>
                                         ))}
                                     </select>
                                 </div>
-                                <div className={""}>
+                                <div className={streamSelected ? "disabled" : ""}>
                                     <div>Audio Format</div>
                                     <select value={audioFormatId} onChange={e => setAudioFormatId(e.target.value)}>
                                         {lookup?.AudioFormats.map(format => (

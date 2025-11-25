@@ -4,6 +4,7 @@ import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
 import {VideoStatus} from "../../Constants/constants.tsx";
 import Hls from "hls.js";
+import {Protocol} from "../../Models/Enums/Protocol.tsx";
 
 export default function FilePlayer(params: {
     videoId: string,
@@ -17,70 +18,94 @@ export default function FilePlayer(params: {
     const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
     const [audioLoaded, setAudioLoaded] = useState<boolean>(false);
     const ignoreNextUpdate = useRef<boolean>(false);
-    const hlsRef = useRef<Hls | null>(null);
-
-    useEffect(() => {
-        // getVideoSource();
-
-        if (videoPlayerRef.current) {
-            if (params.autoplay) {
-                // videoPlayerRef.current.load();
-                // audioPlayerRef.current.load();
-
-                videoPlayerRef.current.play().catch(() => {
-                    audioPlayerRef.current.volume = 0;
-                    audioPlayerRef.current.play();
-                });
-                audioPlayerRef.current.play().then(() => {
-                    // audioPlayerRef.current.volume = getVolumeCookie() ?? 50;
-                }, () => {
-                    audioPlayerRef.current.volume = 0;
-                    audioPlayerRef.current.play();
-                });
-            } else {
-                videoPlayerRef.current.load();
-                audioPlayerRef.current.load();
-            }
-
-            setInterval(() => {
-                if (videoPlayerRef.current && videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended && videoLoaded) {
-                    updateRoomTime(false);
-                    if (audioPlayerRef.current?.paused) {
-                        audioPlayerRef.current.play().catch(() => {
-                            // ignore errors caused by this so we don't fill the console
-                        })
-                    }
-                }
-            }, 1000);
-
-            videoPlayerRef.current.addEventListener("loadedmetadata", () => {
-                videoPlayerRef.current.currentTime = params.startTime;
-                setVideoLoaded(true);
-            });
-
-            audioPlayerRef.current.addEventListener("loadedmetadata", () => {
-                setAudioLoaded(true);
-                audioPlayerRef.current.currentTime = params.startTime;
-                audioPlayerRef.current.muted = false;
-                cookieStore.get("volume").then((cookie) => {
-                    if (cookie) {
-                        console.log(`setting volume ${cookie.value} from cookie`);
-                        audioPlayerRef.current.volume = cookie.value;
-                        document.getElementById("volumeSlider").value = cookie.value * 100;
-                    }
-                });
-            })
-
-            audioPlayerRef.current.addEventListener("play", () => {
-                if (videoPlayerRef.current.currentTime == 0 || videoPlayerRef.current.paused || videoPlayerRef.current.ended || videoPlayerRef.current.readyState <= 2)
-                    audioPlayerRef.current.pause();
-            });
-        }
-    });
 
     const updateRoomTime = useCallback((skipCounter: boolean) => {
         hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
     }, [hub]);
+
+    useEffect(() => {
+        if (!videoPlayerRef.current || !audioPlayerRef.current) return;
+
+        const videoPlayer = videoPlayerRef.current;
+        const audioPlayer = audioPlayerRef.current;
+
+        const videoStream = params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio);
+        if (videoStream?.Protocol == Protocol.Playlist) {
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(videoStream.Url);
+                hls.attachMedia(videoPlayerRef.current);
+            } else {
+                console.log("HLS is unsupported in this browser");
+            }
+        } else if (videoStream?.Protocol == Protocol.Raw) {
+            videoPlayerRef.current.src = videoStream.Url;
+        }
+
+        const onVideoLoadedMetadata = () => {
+            videoPlayer.currentTime = params.startTime;
+            setVideoLoaded(true);
+        };
+
+        const onAudioLoadedMetadata = () => {
+            setAudioLoaded(true);
+            audioPlayer.currentTime = params.startTime;
+            audioPlayer.muted = false;
+            cookieStore.get("volume").then((cookie) => {
+                if (cookie) {
+                    console.log(`setting volume ${cookie.value} from cookie`);
+                    audioPlayer.volume = parseFloat(cookie.value);
+                    const volumeSlider = document.getElementById("volumeSlider") as HTMLInputElement;
+                    if (volumeSlider) {
+                        volumeSlider.value = (parseFloat(cookie.value) * 100).toString();
+                    }
+                }
+            });
+        };
+
+        const onAudioPlay = () => {
+            if (videoPlayer.currentTime == 0 || videoPlayer.paused || videoPlayer.ended || videoPlayer.readyState <= 2)
+                audioPlayer.pause();
+        };
+
+        videoPlayer.addEventListener("loadedmetadata", onVideoLoadedMetadata);
+        audioPlayer.addEventListener("loadedmetadata", onAudioLoadedMetadata);
+        audioPlayer.addEventListener("play", onAudioPlay);
+
+        // Autoplay logic
+        if (params.autoplay && videoPlayer.paused) {
+            videoPlayer.play().catch(() => {
+                audioPlayer.volume = 0;
+                audioPlayer.play();
+            });
+            audioPlayer.play().then(() => {
+                // audioPlayer.volume = getVolumeCookie() ?? 50;
+            }, () => {
+                audioPlayer.volume = 0;
+                audioPlayer.play();
+            });
+        }
+
+        // Sync check interval
+        const syncInterval = setInterval(() => {
+            if (videoPlayer.currentTime > 0 && !videoPlayer.paused && !videoPlayer.ended && videoLoaded) {
+                updateRoomTime(false);
+                if (audioPlayer.paused) {
+                    audioPlayer.play().catch(() => {
+                        // ignore errors caused by this so we don't fill the console
+                    });
+                }
+            }
+        }, 1000);
+
+        return () => {
+            videoPlayer.removeEventListener("loadedmetadata", onVideoLoadedMetadata);
+            audioPlayer.removeEventListener("loadedmetadata", onAudioLoadedMetadata);
+            audioPlayer.removeEventListener("play", onAudioPlay);
+            clearInterval(syncInterval);
+        };
+
+    }, [params.autoplay, params.startTime, updateRoomTime, videoLoaded]);
 
     function onPlay(event : Event) {
         console.log("play")
@@ -92,7 +117,7 @@ export default function FilePlayer(params: {
                 audioPlayerRef.current.play();
             });
             if (event.isTrusted && !ignoreNextUpdate.current)
-                hub.send("PlayVideo");
+                // hub.send("PlayVideo");
             if (ignoreNextUpdate.current) {
                 console.log("played from hub; not sending update to server");
                 ignoreNextUpdate.current = false;
@@ -138,18 +163,16 @@ export default function FilePlayer(params: {
     }
 
     useEffect(() => {
-        syncControl();
-
-        hub.on("PauseVideo", () => {
+        const handlePauseVideo = () => {
             if (!videoPlayerRef.current.paused) {
                 console.log("paused from hub");
                 ignoreNextUpdate.current = true;
                 videoPlayerRef.current.pause();
                 audioPlayerRef.current.pause();
             }
-        });
+        };
 
-        hub.on("PlayVideo", () => {
+        const handlePlayVideo = () => {
             if (videoPlayerRef.current.paused) {
                 console.log("played from hub");
                 ignoreNextUpdate.current = true;
@@ -162,9 +185,9 @@ export default function FilePlayer(params: {
                     audioPlayerRef.current.play();
                 });
             }
-        });
+        };
 
-        hub.on("TimeUpdate", (time: number, status : number | undefined) => {
+        const handleTimeUpdate = (time: number, status : number | undefined) => {
             if (videoPlayerRef.current.currentTime < time - 1 || videoPlayerRef.current.currentTime > time + 1) {
                 videoPlayerRef.current.currentTime = time;
                 audioPlayerRef.current.currentTime = time;
@@ -189,22 +212,35 @@ export default function FilePlayer(params: {
                             audioPlayerRef.current?.play().catch(() => {
                                 audioPlayerRef.current.volume = 0;
                                 audioPlayerRef.current?.play();
-                            });                        }
+                            });
+                        }
                         break;
                 }
             }
-        });
+        };
 
-        function syncControl() {
-            setInterval(() => {
-                if (videoPlayerRef.current && audioPlayerRef.current && (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
-                    audioPlayerRef.current.currentTime != videoPlayerRef.current.currentTime &&
-                    (audioPlayerRef.current.currentTime < videoPlayerRef.current.currentTime - 0.25 || audioPlayerRef.current.currentTime > videoPlayerRef.current.currentTime + 0.25)) {
-                    audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
-                    console.log("video and audio out of sync, syncing");
-                }
-            }, 1000);
-        }
+        hub.on("PauseVideo", handlePauseVideo);
+        hub.on("PlayVideo", handlePlayVideo);
+        hub.on("TimeUpdate", handleTimeUpdate);
+
+        // Audio/Video sync interval
+        const syncInterval = setInterval(() => {
+            if (videoPlayerRef.current && audioPlayerRef.current &&
+                (videoPlayerRef.current.currentTime > 0 && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) &&
+                audioPlayerRef.current.currentTime != videoPlayerRef.current.currentTime &&
+                (audioPlayerRef.current.currentTime < videoPlayerRef.current.currentTime - 0.25 ||
+                    audioPlayerRef.current.currentTime > videoPlayerRef.current.currentTime + 0.25)) {
+                audioPlayerRef.current.currentTime = videoPlayerRef.current.currentTime;
+                console.log("video and audio out of sync, syncing");
+            }
+        }, 1000);
+
+        return () => {
+            hub.off("PauseVideo", handlePauseVideo);
+            hub.off("PlayVideo", handlePlayVideo);
+            hub.off("TimeUpdate", handleTimeUpdate);
+            clearInterval(syncInterval);
+        };
     }, [hub, params.videoId, updateRoomTime]);
 
     function changeVolume(newVolume: number) {
@@ -216,32 +252,6 @@ export default function FilePlayer(params: {
         if (paused)
             audioPlayerRef.current.pause();
     }
-
-    // function getVideoSource() {
-    //     const url = params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url;
-    //     if (!url) return;
-    //     const mediaSource = new MediaSource();
-    //     videoSource.current = URL.createObjectURL(mediaSource);
-    //     console.log(videoSource.current);
-    //     console.log(url);
-    //
-    //     mediaSource.addEventListener('sourceopen', async () => {
-    //         const sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.640020, mp4a.40.2"');
-    //
-    //         // Fetch with custom headers
-    //         const response = await fetch(url);
-    //
-    //         const videoData = await response.arrayBuffer();
-    //         sourceBuffer.appendBuffer(videoData);
-    //
-    //         sourceBuffer.addEventListener('updateend', () => {
-    //             if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
-    //                 mediaSource.endOfStream();
-    //             }
-    //         });
-    //     });
-    // }
-
 
     return <div id="player">
         <video ref={videoPlayerRef}
@@ -256,10 +266,9 @@ export default function FilePlayer(params: {
                onSeeking={onSeeking}
                onEnded={onEnded}
         >
-            <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio)?.Url}/>
         </video>
         <audio className={"hidden"} ref={audioPlayerRef} preload={"auto"} controls={true}>
-            <source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>
+            {/*<source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>*/}
         </audio>
         <input type={"range"} id={"volumeSlider"} onChange={(element) => changeVolume(element.target.value)}/>
     </div>
