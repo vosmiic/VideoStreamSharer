@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VideoStreamBackend.Identity;
 
@@ -10,9 +11,11 @@ using VideoStreamBackend.Identity;
 namespace VideoStreamBackend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251124195049_QueueItemRemoveStatus")]
+    partial class QueueItemRemoveStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -289,9 +292,6 @@ namespace VideoStreamBackend.Migrations
 
                     b.Property<string>("AudioFormatId")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("Protocol")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("VideoFormatId")
                         .IsRequired()
