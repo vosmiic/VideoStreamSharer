@@ -46,7 +46,7 @@ public class PrimaryHub : BaseHub {
         string roomConnectionKey = RedisKeys.RoomConnectionsKey(parsedRoomId);
         string? username = _redis.HashGet(roomConnectionKey, Context.ConnectionId);
         _redis.HashDelete(roomConnectionKey, Context.ConnectionId);
-        UsersHelper.ChangeLeader(new Room{Id = parsedRoomId}, _redis);
+        UsersHelper.ChangeLeader(new Room{Id = parsedRoomId}, _redis, LogInformation);
         if (username != null) {
             await Clients.Group(roomId).SendAsync("RemoveUser", username);
         }
@@ -173,7 +173,7 @@ public class PrimaryHub : BaseHub {
             // User is attempting to update status too often
             LogInformation($"Too many status updates; status: {status}");
             // Attempt to hand over leadership to someone else
-            UsersHelper.ChangeLeader(new Room{Id = Guid.Parse(roomId)}, _redis);
+            UsersHelper.ChangeLeader(new Room{Id = Guid.Parse(roomId)}, _redis, LogInformation);
             return;
         }
         LogInformation($"Accepted status update; status: {status}");

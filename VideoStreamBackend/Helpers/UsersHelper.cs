@@ -5,11 +5,13 @@ using VideoStreamBackend.Redis;
 namespace VideoStreamBackend.Helpers;
 
 public class UsersHelper {
-    public static void ChangeLeader(Room room, IDatabase redis) {
+    public static void ChangeLeader(Room room, IDatabase redis, Action<string> log) {
         RedisValue currentLeader = redis.HashGet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField());
         var connections = redis.HashGetAll(RedisKeys.RoomConnectionsKey(room.Id));
         var newLeader = connections.FirstOrDefault(entry => entry.Value != currentLeader);
-        if (newLeader != default)
-            redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField(), newLeader.Value);
+        if (newLeader != default) {
+            redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentLeaderConnectionIdField(), newLeader.Name);
+            log($"New leader: {newLeader.Value}");
+        }
     }
 }
