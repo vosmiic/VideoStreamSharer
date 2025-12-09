@@ -18,10 +18,12 @@ export default function FilePlayer(params: {
     const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
     const [audioLoaded, setAudioLoaded] = useState<boolean>(false);
     const ignoreNextUpdate = useRef<boolean>(false);
+    const initialSeek = useRef<boolean>(true);
 
     const updateRoomTime = useCallback((skipCounter: boolean) => {
-        hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
-    }, [hub]);
+        if (videoLoaded)
+            hub.send("UpdateRoomTime", videoPlayerRef.current.currentTime, skipCounter);
+    }, [hub, videoLoaded]);
 
     useEffect(() => {
         if (!videoPlayerRef.current || !audioPlayerRef.current) return;
@@ -44,6 +46,7 @@ export default function FilePlayer(params: {
 
         const onVideoLoadedMetadata = () => {
             videoPlayer.currentTime = params.startTime;
+            initialSeek.current = true;
             setVideoLoaded(true);
         };
 
@@ -68,7 +71,7 @@ export default function FilePlayer(params: {
                 audioPlayer.pause();
         };
 
-        videoPlayer.addEventListener("loadedmetadata", onVideoLoadedMetadata);
+        videoPlayer.addEventListener("loadeddata", onVideoLoadedMetadata);
         audioPlayer.addEventListener("loadedmetadata", onAudioLoadedMetadata);
         audioPlayer.addEventListener("play", onAudioPlay);
 
@@ -117,7 +120,7 @@ export default function FilePlayer(params: {
                 audioPlayerRef.current.play();
             });
             if (event.isTrusted && !ignoreNextUpdate.current)
-                // hub.send("PlayVideo");
+                hub.send("PlayVideo");
             if (ignoreNextUpdate.current) {
                 console.log("played from hub; not sending update to server");
                 ignoreNextUpdate.current = false;
@@ -144,7 +147,10 @@ export default function FilePlayer(params: {
             audioPlayerRef.current.play();
         });
         // forcibly update room time
-        updateRoomTime(true);
+        // dont send initial seek to server
+        if (!initialSeek.current) {
+            updateRoomTime(true);
+        }
     }
 
     function onRateChange() {
