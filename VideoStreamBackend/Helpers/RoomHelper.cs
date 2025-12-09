@@ -34,20 +34,38 @@ public class RoomHelper {
             ];
         }
         
-        RedisValue? videoUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentVideoField());
-        RedisValue? audioUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentAudioField());
-
         List<StreamUrl> streamUrls = new List<StreamUrl>();
-        if (videoUrlFromRedis is { HasValue: true } || audioUrlFromRedis is { HasValue: true }) {
-            // retrieve the urls
+        if (redis.HashExists(room.StringifiedId, RedisKeys.RoomCurrentVideoField())) {
+            RedisValue? videoUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentVideoField());
             if (videoUrlFromRedis.HasValue) {
-                streamUrls.Add(JsonSerializer.Deserialize<StreamUrl>(videoUrlFromRedis.Value.ToString()));
+                StreamUrl? videoUrl;
+                try {
+                    videoUrl = JsonSerializer.Deserialize<StreamUrl>(videoUrlFromRedis.Value.ToString());
+                } catch (Exception) {
+                    videoUrl = null;
+                }
+                if (videoUrl != null)
+                    streamUrls.Add(videoUrl);
             }
+        }
+
+        if (redis.HashExists(room.StringifiedId, RedisKeys.RoomCurrentAudioField())) {
+            RedisValue? audioUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentAudioField());
 
             if (audioUrlFromRedis.HasValue) {
-                streamUrls.Add(JsonSerializer.Deserialize<StreamUrl>(audioUrlFromRedis.Value.ToString()));
+                StreamUrl? audioUrls;
+                try {
+                    audioUrls = JsonSerializer.Deserialize<StreamUrl>(audioUrlFromRedis.Value.ToString());
+                } catch (Exception) {
+                    audioUrls = null;
+                }
+                
+                if (audioUrls != null)
+                    streamUrls.Add(audioUrls);
             }
-        } else if (queueItem is YouTubeVideo youtubeVideo) {
+        }
+        
+        if (streamUrls.Count == 0 && queueItem is YouTubeVideo youtubeVideo) {
             // store the video in redis for others
             YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
             var result = await ytDlpHelper.GetVideoUrls(youtubeVideo);
