@@ -1,4 +1,3 @@
-using System.Text;
 using FileSignatures;
 using FileSignatures.Formats;
 using Microsoft.AspNetCore.Mvc;
@@ -42,28 +41,21 @@ public class QueueController : Controller {
 
         Uri uri = QueueHelper.GetYouTubeUrl(new Uri(data.Url));
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-        (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
-        if (info.videoInfo == null) return new BadRequestObjectResult($"Error: {info.error ?? "could not retrieve video info."}");
+        (List<StreamUrl>? urls, VideoInfo? videoInfo, string? error) streams = await QueueHelper.GetStreams(ytDlpHelper, uri);
+        if (streams is { error: not null, urls: not null, videoInfo: not null }) return new BadRequestObjectResult($"Error: {streams.error ?? "could not retrieve video info."}");
         
-        // confirm IDs exist
-        var videoFormat = info.videoInfo.Formats.FirstOrDefault(format => !format.IsAudio && format.FormatId == data.VideoFormatId);
-        var audioFormat = info.videoInfo.Formats.FirstOrDefault(format => format.IsAudio && format.FormatId == data.AudioFormatId);
-        if (videoFormat == null || audioFormat == null) return new BadRequestObjectResult($"Error: format could not be found.");
-
         var video = new YouTubeVideo {
-            Title = info.videoInfo.Title,
+            Title = streams.videoInfo.Title,
             VideoUrl = uri,
-            VideoFormatId = data.VideoFormatId,
-            AudioFormatId = data.AudioFormatId,
-            ThumbnailLocation = info.videoInfo.Thumbnail,
+            ThumbnailLocation = streams.videoInfo.Thumbnail,
             Order = room.Queue.Any() ? room.Queue.Max(queue => queue.Order) + 1 : 0,
-            Protocol = videoFormat.Protocol
         };
         room.Queue.Add(video);
         await _roomService.SaveChanges();
+        QueueHelper.StoreStreams(_redis, streams.urls, room.Id, video.Id);
         await _primaryHubContext.Clients.Group(roomId.ToString()).SendAsync(PrimaryHub.QueueAdded, video);
         if (video.Order == 0)
-            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(_redis, Request, room));
+            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, streams);
 
         /* Old youtube solution
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
@@ -108,7 +100,6 @@ public class QueueController : Controller {
         await _queueItemService.SaveChanges();
         string stringifiedRoomId = roomId.ToString();
         if (currentVideoChanged) {
-            await RoomHelper.ResetRoomCurrentVideo(_redis, _roomService, room, stringifiedRoomId);
             List<StreamUrl>? newStreamUrls = await RoomHelper.GetStreamUrls(_redis, Request, room);
             if (newStreamUrls == null)  return new BadRequestResult();
             await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.VideoChangedMethod, newStreamUrls);
@@ -123,7 +114,7 @@ public class QueueController : Controller {
     public async Task<ActionResult> Lookup([FromQuery] string url) {
         Uri uri = new Uri(url);
         YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-        (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
+        (VideoInfo? videoInfo, string? error) info = await QueueHelper.RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
         if (info.videoInfo == null) return new BadRequestObjectResult($"Error: {info.error ?? "could not retrieve video info"}");
 
         var model = new LookupModel {
@@ -132,24 +123,6 @@ public class QueueController : Controller {
             ThumbnailUrl = info.videoInfo.Thumbnail,
             Viewcount = $"{info.videoInfo.Viewcount:N0}",
             Duration = new DateTimeOffset().AddSeconds(info.videoInfo.Duration).ToString("t"),
-            AudioFormats = info.videoInfo.Formats
-                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: true })
-                .OrderByDescending(stream => stream.Quality)
-                .ThenByDescending(stream => stream.Filesize)
-                .DistinctBy(stream => stream.Resolution)
-                .Select(stream => new LookupModel.LookupFormats {
-                    Id = stream.FormatId,
-                    Value = stream.Quality.ToString("F1"),
-                }).OrderByDescending(format => format.Id),
-            VideoFormats = info.videoInfo.Formats
-                .Where(format => format is { Protocol: VideoInfo.Protocol.https, IsAudio: false } or { Protocol: VideoInfo.Protocol.m3u8_native, IsAudio: false})
-                .OrderByDescending(stream => stream.Quality)
-                .ThenByDescending(stream => stream.Filesize)
-                .DistinctBy(stream => (stream.Resolution, stream.Protocol))
-                .Select(stream => new LookupModel.LookupFormats {
-                    Id = stream.FormatId,
-                    Value = $"{stream.Resolution}{(stream.Protocol == VideoInfo.Protocol.m3u8_native ? " M3U8" : String.Empty)}",
-                }).OrderByDescending(format => format.Id)
         };
 
         return Ok(model);
@@ -239,24 +212,5 @@ public class QueueController : Controller {
         return Ok();
     }
 
-    private static async Task<(VideoInfo? videoInfo, string? error)> RetrieveVideoInfoWithRetries(YtDlpHelper ytDlpHelper, Uri uri) {
-        VideoInfo? info = null;
-        int counter = 0;
-        while (counter < 3) {
-            StringBuilder standardOutput = new StringBuilder();
-            StringBuilder errorOutput = new StringBuilder();
-            (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
-            if (!videoInfo.success || videoInfo.videoInfo == null) return (null, videoInfo.error);
-
-            if (videoInfo.videoInfo.Formats.Length == 0) {
-                // retry the request, sometimes the server provides odd results
-                counter++;
-            } else {
-                info = videoInfo.videoInfo;
-                break;
-            }
-        }
-
-        return (info, null);
-    }
+    
 }

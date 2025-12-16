@@ -1,9 +1,13 @@
+using System.Text;
+using System.Text.Json;
 using System.Web;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 using VideoStreamBackend.Hubs;
 using VideoStreamBackend.Models;
 using VideoStreamBackend.Models.ApiModels;
+using VideoStreamBackend.Models.YtDlp;
+using VideoStreamBackend.Redis;
 using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Helpers;
@@ -25,7 +29,7 @@ public class QueueHelper {
         await queueItemService.SaveChanges();
 
         if (videoToDelete.Order == 0) {
-            await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, room.StringifiedId);
+            await RoomHelper.ResetRoomCurrentVideo(redis, roomService, room, videoToDelete);
             var result = await RoomHelper.GetStreamUrls(redis, request, room);
             if (result == null) return;
             await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.VideoFinishedMethod, new GetRoomResponse {
@@ -36,6 +40,7 @@ public class QueueHelper {
             });
         } else {
             await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.DeleteQueueMethod, videoToDelete.Id);
+            await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(redis, request, room));
         }
     }
 
@@ -68,5 +73,47 @@ public class QueueHelper {
         var generatedThumbnail = await ytDlpHelper.GenerateThumbnail(fileInfo.FullName, convertedScreenshotTime, thumbnailPath);
         if (!generatedThumbnail.success) return (null, false, $"Could not generate thumbnail: {generatedThumbnail.error}");
         return (thumbnailPath, true, null);
+    }
+
+    internal static async Task<(List<StreamUrl>? urls, VideoInfo? videoInfo, string? error)> GetStreams( YtDlpHelper ytDlpHelper, Uri uri) {
+        (VideoInfo? videoInfo, string? error) info = await RetrieveVideoInfoWithRetries(ytDlpHelper, uri);
+        if (info.videoInfo == null) return (null, null, info.error);
+        
+        var streams = info.videoInfo.UniqueFormats().Select((format, index) => new StreamUrl() {
+            Id = index, // arbitrary id to make frontend operations easier
+            Resolution = format.Resolution,
+            Url = format.Url,
+            StreamType = format.Protocol == VideoInfo.Protocol.m3u8_native ? StreamType.VideoAndAudio : format.IsAudio ? StreamType.Audio : StreamType.Video,
+            Expiry = YtDlpHelper.GetExpiry(format.Url),
+            ResolutionName = format.Protocol == VideoInfo.Protocol.m3u8_native ? $"{format.Resolution} m3u8" : format.Resolution,
+            Protocol = format.Protocol
+        }).ToList();
+        
+        return (streams, info.videoInfo, null);
+    }
+
+    internal static void StoreStreams(IDatabase redis, IEnumerable<StreamUrl> streams, Guid roomId, Guid videoId) {
+        redis.HashSet(RedisKeys.RoomStreamsKey(roomId), videoId.ToString(), JsonSerializer.Serialize(streams));
+    }
+    
+    public static async Task<(VideoInfo? videoInfo, string? error)> RetrieveVideoInfoWithRetries(YtDlpHelper ytDlpHelper, Uri uri) {
+        VideoInfo? info = null;
+        int counter = 0;
+        while (counter < 3) {
+            StringBuilder standardOutput = new StringBuilder();
+            StringBuilder errorOutput = new StringBuilder();
+            (VideoInfo? videoInfo, bool success, string? error) videoInfo = await ytDlpHelper.GetVideoInfo(uri, standardOutput, errorOutput);
+            if (!videoInfo.success || videoInfo.videoInfo == null) return (null, videoInfo.error);
+
+            if (videoInfo.videoInfo.Formats.Length == 0) {
+                // retry the request, sometimes the server provides odd results
+                counter++;
+            } else {
+                info = videoInfo.videoInfo;
+                break;
+            }
+        }
+
+        return (info, null);
     }
 }

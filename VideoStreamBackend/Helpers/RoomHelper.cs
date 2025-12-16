@@ -1,8 +1,4 @@
-using System.Security;
-using System.Security.AccessControl;
-using System.Text;
 using System.Text.Json;
-using CliWrap;
 using StackExchange.Redis;
 using VideoStreamBackend.Interfaces;
 using VideoStreamBackend.Models;
@@ -35,69 +31,43 @@ public class RoomHelper {
         }
         
         List<StreamUrl> streamUrls = new List<StreamUrl>();
-        if (redis.HashExists(room.StringifiedId, RedisKeys.RoomCurrentVideoField())) {
-            RedisValue? videoUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentVideoField());
-            if (videoUrlFromRedis.HasValue) {
-                StreamUrl? videoUrl;
+        YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
+        if (redis.HashExists(RedisKeys.RoomStreamsKey(room.Id), queueItem.Id.ToString())) {
+            var redisStreamUrls = redis.HashGet(RedisKeys.RoomStreamsKey(room.Id), queueItem.Id.ToString());
+            if (redisStreamUrls.HasValue) {
+                IEnumerable<StreamUrl>? videoUrl;
                 try {
-                    videoUrl = JsonSerializer.Deserialize<StreamUrl>(videoUrlFromRedis.Value.ToString());
+                    videoUrl = JsonSerializer.Deserialize<IEnumerable<StreamUrl>>(redisStreamUrls.ToString());
                 } catch (Exception) {
                     videoUrl = null;
                 }
-                if (videoUrl != null)
-                    streamUrls.Add(videoUrl);
-            }
-        }
 
-        if (redis.HashExists(room.StringifiedId, RedisKeys.RoomCurrentAudioField())) {
-            RedisValue? audioUrlFromRedis = await redis.HashGetAsync(room.StringifiedId, RedisKeys.RoomCurrentAudioField());
-
-            if (audioUrlFromRedis.HasValue) {
-                StreamUrl? audioUrls;
-                try {
-                    audioUrls = JsonSerializer.Deserialize<StreamUrl>(audioUrlFromRedis.Value.ToString());
-                } catch (Exception) {
-                    audioUrls = null;
+                if (videoUrl != null) {
+                    streamUrls = videoUrl.ToList();
                 }
-                
-                if (audioUrls != null)
-                    streamUrls.Add(audioUrls);
             }
         }
         
-        if (streamUrls.Count == 0 && queueItem is YouTubeVideo youtubeVideo) {
+        if (streamUrls.Count == 0 && queueItem is YouTubeVideo youtubeVideo && youtubeVideo.VideoUrl != null) {
             // store the video in redis for others
-            YtDlpHelper ytDlpHelper = new YtDlpHelper(new CliWrapper());
-            var result = await ytDlpHelper.GetVideoUrls(youtubeVideo);
-            if (!result.success || result.urls == null) {
-                return streamUrls;
-            }
+            var streams = await QueueHelper.GetStreams( ytDlpHelper, youtubeVideo.VideoUrl);
+            if (streams.error != null || streams.urls == null) return null;
+            QueueHelper.StoreStreams(redis, streams.urls, room.Id, youtubeVideo.Id);
 
-            foreach (StreamUrl streamUrl in result.urls) {
-                if (streamUrl.StreamType == StreamType.Video) {
-                    redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentVideoField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(room.StringifiedId, [ RedisKeys.RoomCurrentVideoField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
-                }
-
-                if (streamUrl.StreamType == StreamType.Audio) {
-                    redis.HashSet(room.StringifiedId, RedisKeys.RoomCurrentAudioField(), JsonSerializer.Serialize(streamUrl));
-                    await redis.HashFieldExpireAsync(room.StringifiedId, [ RedisKeys.RoomCurrentAudioField() ], DateTimeOffset.FromUnixTimeSeconds(streamUrl.Expiry).UtcDateTime);
-                }
-            }
-
-            streamUrls = result.urls;
+            streamUrls = streams.urls.ToList();
         }
 
         return streamUrls;
     }
 
-    public static async Task ResetRoomCurrentVideo(IDatabase redis, IRoomService roomService, Room room, string roomId) {
-        redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
-        redis.HashDelete(roomId, RedisKeys.RoomCurrentTimeField());
+    public static async Task ResetRoomCurrentVideo(IDatabase redis, IRoomService roomService, Room room, QueueItem currentVideo) {
+        redis.HashDelete(room.StringifiedId, RedisKeys.RoomUpdateTimeCounterField());
+        redis.HashDelete(room.StringifiedId, RedisKeys.RoomCurrentTimeField());
         room.CurrentTime = 0;
         await roomService.SaveChanges();
-        redis.HashDelete(roomId, RedisKeys.RoomCurrentVideoField());
-        redis.HashDelete(roomId, RedisKeys.RoomCurrentAudioField());
+        redis.HashDelete(RedisKeys.RoomStreamsKey(room.Id), currentVideo.Id.ToString());
+        redis.HashDelete(room.StringifiedId, RedisKeys.RoomCurrentVideoField());
+        redis.HashDelete(room.StringifiedId, RedisKeys.RoomCurrentAudioField());
     }
 
     /// <summary>

@@ -18,8 +18,8 @@ public class VideoInfo {
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public Protocol Protocol { get; set; }
         public double Quality { get; set; }
-        [JsonPropertyName("filesize_approx")]
-        public long FilesizeApprox { get; set; }
+        [JsonPropertyName("filesize")]
+        public long Filesize { get; set; }
         public bool IsAudio => Resolution == "audio only";
         [JsonPropertyName("vcodec")]
         public string? VideoCodec { get; set; }
@@ -27,6 +27,8 @@ public class VideoInfo {
         public string? AudioCodec { get; set; }
         [JsonIgnore]
         public bool IsHdr => Dynamic_range?.StartsWith("HDR") ?? false;
+        [JsonPropertyName("url")]
+        public string Url { get; set; }
     }
 
     public class VideoChannel {

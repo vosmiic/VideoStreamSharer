@@ -12,10 +12,7 @@ export default function QueueAdd() {
     const [loading, setLoading] = useState<boolean>(true);
     const [addingVideo, setAddingVideo] = useState<boolean>(false);
     const [displayPreview, setDisplayPreview] = useState<boolean>(false);
-    const [videoFormatId, setVideoFormatId] = useState<string>();
-    const [audioFormatId, setAudioFormatId] = useState<string>();
     const [error, setError] = useState<string | null>();
-    const [streamSelected, setStreamSelected] = useState<boolean>(false);
     const modal = useRef<HTMLDialogElement>(null);
 
     async function handleOnLookup() {
@@ -28,8 +25,6 @@ export default function QueueAdd() {
                     result.json().then((json: ILookup) => {
                         setLookup(json);
                         setLoading(false);
-                        setVideoFormatId(json.VideoFormats[0].Id);
-                        setAudioFormatId(json.AudioFormats[0].Id);
                     })
                     // todo alert user of success using toast
                 } else {
@@ -44,9 +39,7 @@ export default function QueueAdd() {
 
     async function handleOnSubmit() {
         const queueAdd: IQueueAdd = {
-            Url: input,
-            VideoFormatId: videoFormatId,
-            AudioFormatId: !videoFormatId?.endsWith("M3U8") ? audioFormatId : null
+            Url: input
         }
         setAddingVideo(true);
         setError(null);
@@ -90,16 +83,6 @@ export default function QueueAdd() {
         setDisplayPreview(false);
     }
 
-    function handleOnVideoFormatChange(event : ChangeEvent<HTMLSelectElement>) {
-        const value = event.target.value;
-        setVideoFormatId(value);
-        if (value.endsWith("M3U8")) {
-            setStreamSelected(true);
-        } else {
-            setStreamSelected(false);
-        }
-    }
-
     return (<div>
         <div className={"w-full"}>
             <div className={"flex flex-row"}>
@@ -125,22 +108,6 @@ export default function QueueAdd() {
                                 <div className={"col-span-2"}>
                                     <div>ጸ {lookup?.Viewcount} | ⏱︎ {lookup?.Duration}</div>
                                     <div>{lookup?.Title}</div>
-                                </div>
-                                <div className={""}>
-                                    <div>Video Format</div>
-                                    <select value={videoFormatId} onChange={e => handleOnVideoFormatChange(e)}>
-                                        {lookup?.VideoFormats.map(format => (
-                                            <option key={format.Id} value={format.Id}>{format.Value}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className={streamSelected ? "disabled" : ""}>
-                                    <div>Audio Format</div>
-                                    <select value={audioFormatId} onChange={e => setAudioFormatId(e.target.value)}>
-                                        {lookup?.AudioFormats.map(format => (
-                                            <option key={format.Id} value={format.Id}>{format.Value}</option>
-                                        ))}
-                                    </select>
                                 </div>
                                 <div className={""}>
                                     <button onClick={handleOnSubmit}>Submit{addingVideo ?

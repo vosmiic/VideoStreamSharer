@@ -5,6 +5,7 @@ public class RedisKeys {
     public static string RoomKey(Guid roomId) => $"room-key-{roomId}";
     public static string RoomStatusLockKey(Guid roomId) => $"room-status-lock-{roomId}";
     public static string RoomStatusLockKey(string roomId) => $"room-status-lock-{roomId}";
+    public static string RoomStreamsKey(Guid roomId) => $"room-streams-{roomId}";
     public static string RoomCurrentVideoField() => "current-video";
     public static string RoomCurrentAudioField() => "current-audio";
     public static string RoomCurrentTimeField() => "current-time";

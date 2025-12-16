@@ -69,28 +69,4 @@ public class YtDlpHelperTests {
         Assert.That(result.success, Is.True);
         Assert.That(result.videoInfo, Is.Not.Null);
     }
-
-    [Test]
-    public async Task GetVideoUrlTest() {
-        cliWrapper.Setup(cliwrapper => cliwrapper.ExecuteBufferedAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<PipeTarget>(), It.IsAny<PipeTarget>())).Returns(Task.FromResult(new CommandResult {
-            IsSuccess = true,
-        }));
-        (StringBuilder, StringBuilder) videoOutput = (new StringBuilder(), new StringBuilder());
-        (StringBuilder, StringBuilder) audioOutput = (new StringBuilder(), new StringBuilder());
-        long expiry = 1753479377;
-
-        videoOutput.Item1.Append($"https://test.com?expire={expiry}");
-        audioOutput.Item1.Append("https://test.com");
-        
-        YtDlpHelper ytDlpHelper = new YtDlpHelper(cliWrapper.Object);
-        var result = await ytDlpHelper.GetVideoUrls(new YouTubeVideo {
-            VideoUrl = new Uri("https://test.com"),
-            Protocol = VideoInfo.Protocol.https
-        }, videoOutput, audioOutput);
-        Assert.That(result.success, Is.True);
-        Assert.That(result.urls, Is.Not.Empty);
-        Assert.That(result.error, Is.Null);
-        Assert.That(result.urls.Exists(streamUrl => streamUrl.Expiry == expiry));
-        Assert.That(result.urls.Exists(streamUrl => (streamUrl.Expiry < DateTimeOffset.UtcNow.AddHours(6).AddSeconds(30).ToUnixTimeSeconds()) && (streamUrl.Expiry > DateTimeOffset.UtcNow.AddHours(5).AddMinutes(59).AddSeconds(30).ToUnixTimeSeconds())));
-    }
 }

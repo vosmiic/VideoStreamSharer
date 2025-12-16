@@ -34,7 +34,7 @@ public class YtDlpHelper {
     }
 
     public async Task<(VideoInfo? videoInfo, bool success, string? error)> GetVideoInfo(Uri uri, StringBuilder standardOutput, StringBuilder errorOutput) {
-        var argument = $"-q -O \"{{\\\"{nameof(VideoInfo.Title)}\\\": %(.{nameof(VideoInfo.Title).ToLower()})j, \\\"{nameof(VideoInfo.Formats)}\\\": %(.{nameof(VideoInfo.Formats).ToLower()}.:.{{format_id,{nameof(VideoInfo.StreamFormat.Resolution).ToLower()},{nameof(VideoInfo.StreamFormat.Quality).ToLower()},filesize_approx,{nameof(VideoInfo.StreamFormat.Protocol).ToLower()},vcodec,acodec,dynamic_range}})j, \\\"{nameof(VideoInfo.Thumbnail)}\\\": %(.{nameof(VideoInfo.Thumbnail).ToLower()})j, \\\"{nameof(VideoInfo.Channel)}\\\": {{\\\"{nameof(VideoInfo.VideoChannel.Name)}\\\": %(.{nameof(VideoInfo.Channel).ToLower()}|\"Unknown\")j, \\\"{nameof(VideoInfo.VideoChannel.Url)}\\\": %(.channel_url)j}}, \\\"{nameof(VideoInfo.Duration)}\\\": %(.{nameof(VideoInfo.Duration).ToLower()})j, \\\"{nameof(VideoInfo.Viewcount)}\\\": %(.view_count)j}}\" {uri}";
+        var argument = $"-q -O \"{{\\\"{nameof(VideoInfo.Title)}\\\": %(.{nameof(VideoInfo.Title).ToLower()})j, \\\"{nameof(VideoInfo.Formats)}\\\": %(.{nameof(VideoInfo.Formats).ToLower()}.:.{{format_id,{nameof(VideoInfo.StreamFormat.Resolution).ToLower()},{nameof(VideoInfo.StreamFormat.Quality).ToLower()},filesize,{nameof(VideoInfo.StreamFormat.Protocol).ToLower()},vcodec,acodec,dynamic_range,{nameof(VideoInfo.StreamFormat.Url).ToLower()}}})j, \\\"{nameof(VideoInfo.Thumbnail)}\\\": %(.{nameof(VideoInfo.Thumbnail).ToLower()})j, \\\"{nameof(VideoInfo.Channel)}\\\": {{\\\"{nameof(VideoInfo.VideoChannel.Name)}\\\": %(.{nameof(VideoInfo.Channel).ToLower()}|\"Unknown\")j, \\\"{nameof(VideoInfo.VideoChannel.Url)}\\\": %(.channel_url)j}}, \\\"{nameof(VideoInfo.Duration)}\\\": %(.{nameof(VideoInfo.Duration).ToLower()})j, \\\"{nameof(VideoInfo.Viewcount)}\\\": %(.view_count)j}}\" {uri}";
         // evaluates to: {"Title": %(title)j, "Formats": %(.formats.:.{format_id,resolution,quality,filesize_approx,protocol,vcodec,acodec,dynamic_range})j, "Thumbnail": %(thumbnail)j, "Channel": {"Name": %(channel|"Unknown")j, "Url": %(.channel_url)j}, "Duration": %(duration)j, "Viewcount": %(view_count)j}
         var result = await _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, argument, PipeTarget.ToStringBuilder(standardOutput), PipeTarget.ToStringBuilder(errorOutput));
         if (!result.IsSuccess) return (null, result.IsSuccess, errorOutput.ToString());
@@ -47,51 +47,6 @@ public class YtDlpHelper {
         if (videoInfo == null) return (null, false, "Could not parse video info");
         
         return (videoInfo, true, null);
-    }
-
-    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(YouTubeVideo youtubeVideo) {
-        (StringBuilder, StringBuilder) videoOutput = (new StringBuilder(), new StringBuilder());
-        (StringBuilder, StringBuilder) audioOutput = (new StringBuilder(), new StringBuilder());
-
-        return await GetVideoUrls(youtubeVideo, videoOutput, audioOutput);
-    }
-
-    public async Task<(List<StreamUrl>? urls, bool success, string? error)> GetVideoUrls(YouTubeVideo youtubeVideo,
-        (StringBuilder standardOutput, StringBuilder errorOutput) videoOutput,
-        (StringBuilder standardOutput, StringBuilder errorOutput) audioOutput) {
-        if (youtubeVideo == null) return (null, false, null); // todo handle uploaded videos
-        string argument = $"-q -g \"{youtubeVideo.VideoUrl}\" -f";
-        List<Task<CommandResult>> jobs = new List<Task<CommandResult>>();
-        Task<CommandResult> videoTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.VideoFormatId}\"", PipeTarget.ToStringBuilder(videoOutput.standardOutput), PipeTarget.ToStringBuilder(videoOutput.errorOutput));
-        jobs.Add(videoTask);
-        bool getAudioUrl = youtubeVideo.Protocol != VideoInfo.Protocol.m3u8_native;
-        if (getAudioUrl) {
-            var audioTask = _cliWrapper.ExecuteBufferedAsync(YtDlpFilePath, $"{argument} \"{youtubeVideo.AudioFormatId}\"", PipeTarget.ToStringBuilder(audioOutput.standardOutput), PipeTarget.ToStringBuilder(audioOutput.errorOutput));
-            jobs.Add(audioTask);
-        }
-        var result = await Task.WhenAll(jobs);
-        if (!result.All(cr => cr.IsSuccess)) return (null, false, $"Video error: {videoOutput.errorOutput}; Audio error: {audioOutput.errorOutput}");
-        
-        string videoUrl = videoOutput.standardOutput.ToString();
-        List<StreamUrl> streamUrls = new List<StreamUrl> {
-            new()  {
-                Url = videoUrl,
-                StreamType = StreamType.Video,
-                Expiry = GetExpiry(videoUrl),
-                Protocol = youtubeVideo.Protocol
-            }
-        };
-        if (getAudioUrl) {
-            string audioUrl = audioOutput.standardOutput.ToString();
-            streamUrls.Add(new()  {
-                Url = audioUrl,
-                StreamType = StreamType.Audio,
-                Expiry = GetExpiry(audioUrl),
-                Protocol = youtubeVideo.Protocol
-            });
-        }
-        
-        return (streamUrls, true, null);
     }
 
     /// <summary>
@@ -145,7 +100,7 @@ public class YtDlpHelper {
         return (true, null);
     }
 
-    private long GetExpiry(string url) {
+    public static long GetExpiry(string url) {
         Uri streamUri = new Uri(url);
         NameValueCollection parameters = HttpUtility.ParseQueryString(streamUri.Query);
         string? expiry = parameters.Get("expire");

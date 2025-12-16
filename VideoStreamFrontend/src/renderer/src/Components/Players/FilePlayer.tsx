@@ -1,4 +1,4 @@
-import {useCallback, useContext, useEffect, useRef, useState} from "react";
+import {SetStateAction, useCallback, useContext, useEffect, useRef, useState} from "react";
 import {HubContext} from "../../Contexts/HubContext.tsx";
 import StreamUrl from "../../Models/StreamUrl.tsx";
 import {StreamType} from "../../Models/Enums/StreamType.tsx";
@@ -17,8 +17,10 @@ export default function FilePlayer(params: {
     const audioPlayerRef = useRef<HTMLAudioElement>();
     const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
     const [audioLoaded, setAudioLoaded] = useState<boolean>(false);
+    const [selectedStreamUrl, setSelectedStreamUrl] = useState<StreamUrl>(params.streamUrls.reduce((prev, curr) => prev.Id < curr.Id ? prev : curr));
     const ignoreNextUpdate = useRef<boolean>(false);
     const initialSeek = useRef<boolean>(true);
+    const sourceChangeResumeTime = useRef<number | undefined>(undefined);
 
     const updateRoomTime = useCallback((skipCounter: boolean) => {
         if (videoLoaded)
@@ -26,26 +28,34 @@ export default function FilePlayer(params: {
     }, [hub, videoLoaded]);
 
     useEffect(() => {
+        setSelectedStreamUrl(params.streamUrls.reduce((prev, curr) => prev.Id < curr.Id ? prev : curr));
+    }, [params.streamUrls])
+
+    useEffect(() => {
         if (!videoPlayerRef.current || !audioPlayerRef.current) return;
 
         const videoPlayer = videoPlayerRef.current;
         const audioPlayer = audioPlayerRef.current;
 
-        const videoStream = params.streamUrls?.find(url => url.StreamType === StreamType.Video || url.StreamType === StreamType.VideoAndAudio);
-        if (videoStream?.Protocol == Protocol.Playlist) {
+        if (selectedStreamUrl?.Protocol == Protocol.Playlist) {
             if (Hls.isSupported()) {
                 const hls = new Hls();
-                hls.loadSource(videoStream.Url);
+                hls.loadSource(selectedStreamUrl.Url);
                 hls.attachMedia(videoPlayerRef.current);
             } else {
                 console.log("HLS is unsupported in this browser");
             }
-        } else if (videoStream?.Protocol == Protocol.Raw) {
-            videoPlayerRef.current.src = videoStream.Url;
+        } else if (selectedStreamUrl.Protocol == Protocol.Raw) {
+            videoPlayerRef.current.src = selectedStreamUrl.Url;
         }
 
         const onVideoLoadedMetadata = () => {
-            videoPlayer.currentTime = params.startTime;
+            if (sourceChangeResumeTime.current) {
+                videoPlayer.currentTime = sourceChangeResumeTime.current;
+                sourceChangeResumeTime.current = undefined;
+            } else {
+                videoPlayer.currentTime = params.startTime;
+            }
             initialSeek.current = true;
             setVideoLoaded(true);
         };
@@ -108,7 +118,7 @@ export default function FilePlayer(params: {
             clearInterval(syncInterval);
         };
 
-    }, [params.autoplay, params.startTime, updateRoomTime, videoLoaded]);
+    }, [params.autoplay, params.startTime, selectedStreamUrl, updateRoomTime, videoLoaded]);
 
     function onPlay(event : Event) {
         console.log("play")
@@ -259,6 +269,14 @@ export default function FilePlayer(params: {
             audioPlayerRef.current.pause();
     }
 
+    function onStreamUrlChange(streamUrlId : string) {
+        if (videoPlayerRef.current)
+            sourceChangeResumeTime.current = videoPlayerRef.current.currentTime;
+        const matchingStreamUrl = params.streamUrls.find(streamUrl => streamUrl.Id == parseInt(streamUrlId));
+        if (!matchingStreamUrl) return;
+        setSelectedStreamUrl(matchingStreamUrl);
+    }
+
     return <div id="player">
         <video ref={videoPlayerRef}
                className={"min-w-full"}
@@ -277,5 +295,12 @@ export default function FilePlayer(params: {
             {/*<source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>*/}
         </audio>
         <input type={"range"} id={"volumeSlider"} onChange={(element) => changeVolume(element.target.value)}/>
+        <select className={"select"} value={selectedStreamUrl.Id} onChange={(e) => onStreamUrlChange(e.target.value)}>
+            {params.streamUrls.map(streamUrl => {
+                    if (streamUrl.StreamType != StreamType.Audio)
+                        return <option key={streamUrl.Id} value={streamUrl.Id}>{streamUrl.ResolutionName}</option>
+                }
+            )}
+        </select>
     </div>
 }
