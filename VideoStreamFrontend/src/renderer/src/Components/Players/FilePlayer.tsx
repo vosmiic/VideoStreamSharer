@@ -42,11 +42,15 @@ export default function FilePlayer(params: {
                 const hls = new Hls();
                 hls.loadSource(selectedStreamUrl.Url);
                 hls.attachMedia(videoPlayerRef.current);
+                audioPlayer.src = ""; //unload the audio player since audio will be embedded in the playlist video
             } else {
                 console.log("HLS is unsupported in this browser");
             }
         } else if (selectedStreamUrl.Protocol == Protocol.Raw) {
             videoPlayerRef.current.src = selectedStreamUrl.Url;
+            const audioStreamUrl = params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url;
+            if (audioStreamUrl)
+                audioPlayer.src = audioStreamUrl;
         }
 
         const onVideoLoadedMetadata = () => {
@@ -279,9 +283,7 @@ export default function FilePlayer(params: {
                onEnded={onEnded}
         >
         </video>
-        <audio className={"hidden"} ref={audioPlayerRef} preload={"auto"} controls={true}>
-            {/*<source src={params.streamUrls?.find(url => url.StreamType === StreamType.Audio)?.Url}/>*/}
-        </audio>
+            <audio className={"hidden"} ref={audioPlayerRef} preload={"auto"} controls={true} />
         <input type={"range"} id={"volumeSlider"} onChange={(element) => changeVolume(element.target.value)}/>
         <select className={"select"} value={selectedStreamUrl.Id} onChange={(e) => onStreamUrlChange(e.target.value)}>
             {params.streamUrls.map(streamUrl => {
