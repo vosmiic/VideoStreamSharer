@@ -34,13 +34,13 @@ public class QueueHelper {
             if (result == null) return;
             await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.VideoFinishedMethod, new GetRoomResponse {
                 Room = new RoomApiModel {
-                    StreamUrls = result,
+                    StreamUrls = FilterStreams(result, request),
                     Queue = RoomHelper.GetQueueModel(room, request)
                 }
             });
         } else {
             await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.DeleteQueueMethod, videoToDelete.Id);
-            await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(redis, request, room));
+            await clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, FilterStreams(await RoomHelper.GetStreamUrls(redis, request, room), request));
         }
     }
 
@@ -115,5 +115,15 @@ public class QueueHelper {
         }
 
         return (info, null);
+    }
+
+    /// <summary>
+    /// Filter streams depending on the client.
+    /// </summary>
+    /// <param name="streams">Streams to filter.</param>
+    /// <param name="httpRequest">Request made by the client.</param>
+    /// <returns>List of filtered streams.</returns>
+    public static IEnumerable<StreamUrl>? FilterStreams(List<StreamUrl>? streams, HttpRequest httpRequest) {
+        return httpRequest.Headers.UserAgent.Any(agent => agent != null && agent.Contains("electron", StringComparison.OrdinalIgnoreCase)) ? streams : streams?.Where(stream => stream.Protocol != VideoInfo.Protocol.m3u8_native);
     }
 }

@@ -55,7 +55,7 @@ public class QueueController : Controller {
         QueueHelper.StoreStreams(_redis, streams.urls, room.Id, video.Id);
         await _primaryHubContext.Clients.Group(roomId.ToString()).SendAsync(PrimaryHub.QueueAdded, video);
         if (video.Order == 0)
-            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, streams);
+            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, QueueHelper.FilterStreams(streams.urls, HttpContext.Request));
 
         /* Old youtube solution
         Regex regex = new Regex(@"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})", RegexOptions.IgnoreCase);
@@ -102,7 +102,7 @@ public class QueueController : Controller {
         if (currentVideoChanged) {
             List<StreamUrl>? newStreamUrls = await RoomHelper.GetStreamUrls(_redis, Request, room);
             if (newStreamUrls == null)  return new BadRequestResult();
-            await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.VideoChangedMethod, newStreamUrls);
+            await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.VideoChangedMethod, QueueHelper.FilterStreams(newStreamUrls, ControllerContext.HttpContext.Request));
         }
         
         await _primaryHubContext.Clients.Group(stringifiedRoomId).SendAsync(PrimaryHub.QueueOrderChangedMethod, room.Queue.Select(queueItem => new {queueItem.Id, queueItem.Order}));
@@ -207,7 +207,7 @@ public class QueueController : Controller {
         uploadedMedia.ThumbnailLocation = RoomHelper.GetVideoFileUrl(Request, uploadedMedia.ThumbnailLocation);
         await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.QueueAdded, uploadedMedia, cancellationToken: cancellationToken);
         if (uploadedMedia.Order == 0)
-            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, await RoomHelper.GetStreamUrls(_redis, Request, room), cancellationToken: cancellationToken);
+            await _primaryHubContext.Clients.Group(room.StringifiedId).SendAsync(PrimaryHub.LoadVideoMethod, QueueHelper.FilterStreams(await RoomHelper.GetStreamUrls(_redis, Request, room), ControllerContext.HttpContext.Request), cancellationToken: cancellationToken);
 
         return Ok();
     }

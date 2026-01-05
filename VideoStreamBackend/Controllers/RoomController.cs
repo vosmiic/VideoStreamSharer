@@ -58,7 +58,7 @@ public class RoomController : Controller {
             Room = new RoomApiModel {
                 Id = room.Id,
                 Name = room.Name,
-                StreamUrls = room.CurrentVideo() != null ? await RoomHelper.GetStreamUrls(_redis, Request, room) : null,
+                StreamUrls = room.CurrentVideo() != null ? QueueHelper.FilterStreams(await RoomHelper.GetStreamUrls(_redis, Request, room), HttpContext.Request) : null,
                 Status = roomStatus,
                 CurrentTime = currentTime,
                 Queue = RoomHelper.GetQueueModel(room, Request)
