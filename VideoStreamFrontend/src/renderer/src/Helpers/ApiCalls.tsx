@@ -56,3 +56,17 @@ export async function UploadVideo(roomId : string, data : FormData) {
         body: data
     })
 }
+
+export async function GetLoginInfo() {
+    return await fetch(`${constants.API_URL}/manage/info`, {
+        method: "GET",
+        credentials: "include"
+    });
+}
+
+export async function Logout() {
+    return await fetch(`${constants.API_URL}/logout`, {
+        method: "POST",
+        credentials: "include"
+    });
+}

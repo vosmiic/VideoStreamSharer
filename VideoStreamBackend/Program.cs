@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using StackExchange.Redis;
@@ -12,22 +13,19 @@ var builder = WebApplication.CreateBuilder(args);
 // builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 //     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 
-builder.Services.AddDbContext<ApplicationDbContext>(
-    options => {
-        options.UseLazyLoadingProxies().UseSqlite("Data Source=database.db");
-        options.EnableSensitiveDataLogging();
-    });
+builder.Services.AddDbContext<ApplicationDbContext>(options => {
+    options.UseLazyLoadingProxies().UseSqlite("Data Source=database.db");
+    options.EnableSensitiveDataLogging();
+});
 builder.Services.AddAuthorization()
     .AddCookiePolicy(opt => opt.MinimumSameSitePolicy = SameSiteMode.None);
 
-builder.Services.AddIdentityApiEndpoints<ApplicationUser>(config => {
-        config.SignIn.RequireConfirmedAccount = false;
-    })
+builder.Services.ConfigureApplicationCookie(options => { options.Cookie.SameSite = SameSiteMode.None; });
+
+builder.Services.AddIdentityApiEndpoints<ApplicationUser>(config => { config.SignIn.RequireConfirmedAccount = false; })
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
-builder.Services.AddControllers().AddJsonOptions(options => {
-    options.JsonSerializerOptions.PropertyNamingPolicy = null;
-});
+builder.Services.AddControllers().AddJsonOptions(options => { options.JsonSerializerOptions.PropertyNamingPolicy = null; });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -49,6 +47,14 @@ builder.Services.AddLogging(logging =>  {
 var app = builder.Build();
 
 app.MapIdentityApi<ApplicationUser>();
+
+app.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
+    {
+        await signInManager.SignOutAsync();
+        return Results.Ok();
+    })
+    .WithOpenApi()
+    .RequireAuthorization();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) {

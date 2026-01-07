@@ -27,6 +27,12 @@ export default function Login() {
             body: JSON.stringify(registerBody),
             credentials: "include"
         }).then(result => {
+            const returnPath = new URL(window.location.href).searchParams.get('return')
+            if (returnPath != null) {
+                window.location.href = returnPath;
+            } else {
+                window.location.href = window.location.origin;
+            }
             console.log(result);
         }).catch(error => {
             console.log(error);
