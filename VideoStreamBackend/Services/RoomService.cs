@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using VideoStreamBackend.Identity;
 using VideoStreamBackend.Models;
@@ -13,4 +14,14 @@ public class RoomService (ApplicationDbContext context) : IRoomService {
     
     public async Task<Room?> GetRoomById(Guid id) =>
         await _rooms.Include(room => room.Queue).FirstOrDefaultAsync(room => room.Id.CompareTo(id) == 0);
+
+    public IEnumerable<T> GetMultiple<T>(Expression<Func<Room, T>> cast, Expression<Func<Room, bool>>? selector = null) {
+        var rooms = _rooms.AsQueryable();
+        
+        if (selector != null) {
+            rooms = rooms.Where(selector);
+        }
+        
+        return rooms.Select(cast);
+    }
 }

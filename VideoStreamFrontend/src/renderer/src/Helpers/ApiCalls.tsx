@@ -70,3 +70,9 @@ export async function Logout() {
         credentials: "include"
     });
 }
+
+export async function GetHomeInfo() {
+    return await fetch(`${constants.API_URL}/home`, {
+        method: "GET"
+    });
+}
