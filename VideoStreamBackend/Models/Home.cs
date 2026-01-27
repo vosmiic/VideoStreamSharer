@@ -5,6 +5,7 @@ namespace VideoStreamBackend.Models;
 public class Home {
     [JsonPropertyName("RoomNames")]
     public required IEnumerable<HomeRoomNameDisplay> RoomNames { get; set; }
+    public IEnumerable<HomeRoomNameDisplay>? RecentRooms { get; set; }
 }
 
 public class HomeRoomNameDisplay {

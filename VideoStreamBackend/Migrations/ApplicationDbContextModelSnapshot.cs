@@ -248,6 +248,25 @@ namespace VideoStreamBackend.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("VideoStreamBackend.Models.RecentRoom", b =>
+                {
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("VisitDateTime")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RoomId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RecentRooms", (string)null);
+                });
+
             modelBuilder.Entity("VideoStreamBackend.Models.Room", b =>
                 {
                     b.Property<Guid>("Id")
@@ -353,6 +372,25 @@ namespace VideoStreamBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Room");
+                });
+
+            modelBuilder.Entity("VideoStreamBackend.Models.RecentRoom", b =>
+                {
+                    b.HasOne("VideoStreamBackend.Models.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VideoStreamBackend.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Room");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("VideoStreamBackend.Models.Room", b =>

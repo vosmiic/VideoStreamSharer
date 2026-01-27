@@ -7,12 +7,12 @@ import Queue from "./Queue/Queue.tsx";
 import {RoomContext} from "../Contexts/RoomContext.tsx";
 import {HubContext} from "../Contexts/HubContext.tsx";
 import {HubConnectionState} from "@microsoft/signalr";
-import Users from "./Users.tsx";
 import FilePlayer from "./Players/FilePlayer.tsx";
-import {VideoStatus} from "../Constants/constants.tsx";
+import {RecentRoomsCookieName, VideoStatus, MaxRecentRoomsCount} from "../Constants/constants.tsx";
 import {IQueue} from "../Interfaces/IQueue.tsx";
 import StreamUrl from "../Models/StreamUrl.tsx";
 import RoomRightPanel from "./RoomRightPanel.tsx";
+import {IRoomName} from "../Interfaces/IHome.tsx";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -47,12 +47,51 @@ export default function RoomBody(params: {roomId: string}) {
                                 setStreamUrls(parsed.Room.StreamUrls);
                                 setUsers(parsed.Users);
                                 setLoadState(2);
+                                // hub.send("VisitedRoom");
+                                cookieStore.get(RecentRoomsCookieName).then((recentRoomsCookieItem) => {
+                                    const newCookieItem: IRoomName = {
+                                        Id: parsed.Room.Id,
+                                        Name: parsed.Room.Name,
+                                        VisitDateTime: new Date()
+                                    };
+                                    const cookieExpiration = new Date();
+                                    cookieExpiration.setDate(cookieExpiration.getDate() + 365);
+                                    const cookieOptions: CookieInit = {
+                                        name: RecentRoomsCookieName,
+                                        value: "",
+                                        expires: cookieExpiration.getTime()
+                                    }
+                                    if (recentRoomsCookieItem == null || !recentRoomsCookieItem.value) {
+                                        cookieOptions.value = JSON.stringify([newCookieItem]);
+                                        cookieStore.set(cookieOptions).catch((e) => console.log(e));
+                                        console.log(cookieOptions);
+                                    } else {
+                                        let existingCookieItem = JSON.parse(recentRoomsCookieItem.value) as Array<IRoomName>;
+                                        let existingRoomName = existingCookieItem.find(roomName => roomName.Id == params.roomId);
+                                        moveRoomToMostRecent(existingCookieItem, existingRoomName ?? newCookieItem, existingRoomName !== undefined);
+                                        cookieOptions.value = JSON.stringify(existingCookieItem);
+                                        cookieStore.set(cookieOptions);
+                                    }
+                                })
+
                             })
                         } else {
                             setLoadState(1);
                         }
                     }
                 });
+        }
+
+        function moveRoomToMostRecent(currentList : IRoomName[], newItem : IRoomName, alreadyExists : boolean) {
+            if (currentList.length === MaxRecentRoomsCount) {
+                currentList.sort((a, b) => a.VisitDateTime.getTime() - b.VisitDateTime.getTime()).pop();
+            }
+
+            if (alreadyExists) {
+                newItem.VisitDateTime = new Date();
+            } else {
+                currentList.push(newItem);
+            }
         }
 
         async function connectHub() {

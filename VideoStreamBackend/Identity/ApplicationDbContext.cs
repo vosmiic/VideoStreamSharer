@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser> {
     protected override void OnModelCreating(ModelBuilder builder) {
         new RoomConfiguration().Configure(builder.Entity<Room>());
         new QueueItemConfiguration().Configure(builder.Entity<QueueItem>());
+        new RecentRoomConfiguration().Configure(builder.Entity<RecentRoom>());
         base.OnModelCreating(builder);
     }
 }

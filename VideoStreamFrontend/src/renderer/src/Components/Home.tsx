@@ -2,17 +2,30 @@ import {useEffect, useState} from "react";
 import {Button, Input} from "@headlessui/react";
 import * as constants from "../Constants/constants.tsx";
 import {useNavigate} from "react-router-dom";
-import {IHome} from "../Interfaces/IHome.tsx";
+import {IHome, IRoomName} from "../Interfaces/IHome.tsx";
 import {GetHomeInfo} from "../Helpers/ApiCalls.tsx";
+import {RecentRoomsCookieName} from "../Constants/constants.tsx";
 
 export default function Home() {
     const navigation = useNavigate();
     const [roomName, setRoomName] = useState('');
     const [joinRoomId, setJoinRoomId] = useState('');
     const [home, setHome] = useState<IHome | null>(null);
+    const [recentRooms, setRecentRooms] = useState<Array<IRoomName> | null>(null);
 
     useEffect(() => {
-        GetHomeInfo()
+        let getRecentRoomsFromServer = false;
+        cookieStore.get(RecentRoomsCookieName).then((recentRoomsCookieItem) => {
+            if (recentRoomsCookieItem == null) {
+                getRecentRoomsFromServer = true;
+            } else {
+                if (recentRoomsCookieItem.value) {
+                    setRecentRooms(JSON.parse(recentRoomsCookieItem.value) as Array<IRoomName>);
+                }
+            }
+        })
+
+        GetHomeInfo(getRecentRoomsFromServer)
             .then((result) => {
                 if (result.ok) {
                     result.json().then((homeInfo : IHome) => {
@@ -62,13 +75,21 @@ export default function Home() {
                     <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} type="text"/>
                     <Button onClick={handleSubmit}>Submit</Button>
                 </div>
-                <div className={"flex-auto w-1/2 bg-blue-800"}>
-                    <p>Join room:</p>
-                    <input type={"text"} placeholder={"Enter Room Name"} list={"rooms"} onChange={(e) => setJoinRoomId(e.target.value)}/>
-                    <datalist id={"rooms"}>
-                        {home != null ? home?.RoomNames.map((roomName) => <option value={roomName.Id} label={roomName.Name} key={roomName.Id}></option> ) : <></>}
-                    </datalist>
-                    <Button onClick={handleGo}>Go</Button>
+                <div className={"flex-auto w-1/2"}>
+                    <div className={"bg-blue-800"}>
+                        <p>Join room:</p>
+                        <input type={"text"} placeholder={"Enter Room Name"} list={"rooms"} onChange={(e) => setJoinRoomId(e.target.value)}/>
+                        <datalist id={"rooms"}>
+                            {home != null ? home?.RoomNames.map((roomName) => <option value={roomName.Id} label={roomName.Name} key={roomName.Id}></option> ) : <></>}
+                        </datalist>
+                        <Button onClick={handleGo}>Go</Button>
+                    </div>
+                    <div className={"bg-lime-600"}>
+                        Recent rooms:
+                        {recentRooms ? recentRooms.sort((a, b) => a.VisitDateTime.getTime() - b.VisitDateTime.getTime()).map((roomName) => <div key={roomName.Id}>
+                            <a onClick={() => navigation(`./room/${roomName.Id}`)}>{roomName.Name}</a>
+                        </div>) : <></>}
+                    </div>
                 </div>
             </div>
         </div>

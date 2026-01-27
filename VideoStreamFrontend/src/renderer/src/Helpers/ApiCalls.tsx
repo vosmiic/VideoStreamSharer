@@ -71,8 +71,8 @@ export async function Logout() {
     });
 }
 
-export async function GetHomeInfo() {
-    return await fetch(`${constants.API_URL}/home`, {
+export async function GetHomeInfo(includeRecentRooms : boolean) {
+    return await fetch(`${constants.API_URL}/home${includeRecentRooms ? '?includeRecentRooms=true' : ''}`, {
         method: "GET"
     });
 }

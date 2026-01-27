@@ -4,5 +4,6 @@ export interface IHome {
 
 export interface IRoomName {
     Id : string,
-    Name : string
+    Name : string,
+    VisitDateTime : Date
 }

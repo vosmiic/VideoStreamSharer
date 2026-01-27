@@ -9,11 +9,9 @@ using VideoStreamBackend.Services;
 
 namespace VideoStreamBackend.Hubs;
 
-public class PrimaryHub : BaseHub {
-    private readonly IDatabase _redis;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IRoomService _roomService;
-    private readonly IQueueItemService _queueItemService;
+public class PrimaryHub (IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService, ILogger<PrimaryHub> logger, IRecentRoomService recentRoomService)
+    : BaseHub(logger) {
+    private readonly IDatabase _redis = connectionMultiplexer.GetDatabase();
 
     #region HubMethods
 
@@ -31,13 +29,6 @@ public class PrimaryHub : BaseHub {
 
     #endregion
 
-    public PrimaryHub(IConnectionMultiplexer connectionMultiplexer, UserManager<ApplicationUser> userManager, IRoomService roomService, IQueueItemService queueItemService, ILogger<PrimaryHub> logger) : base(logger) {
-        _redis = connectionMultiplexer.GetDatabase();
-        _userManager = userManager;
-        _roomService = roomService;
-        _queueItemService = queueItemService;
-    }
-    
     public override async Task OnDisconnectedAsync(Exception? exception) {
         var roomId = Context.GetHttpContext()?.Request.Query["roomId"].ToString();
         if (string.IsNullOrEmpty(roomId)) return;
@@ -56,14 +47,16 @@ public class PrimaryHub : BaseHub {
 
     public override async Task OnConnectedAsync() {
         string? username = null;
+        bool authenticated = true;
         if (Context.User != null) {
-            var user = await _userManager.GetUserAsync(Context.User);
+            var user = await userManager.GetUserAsync(Context.User);
             username = user?.UserName;
         }
 
         if (username == null) {
             // todo generate real random usernames
             username = Guid.NewGuid().ToString().Replace("-", "");
+            authenticated = false;
         }
 
         string? roomId = Context.GetHttpContext()?.Request.Query["roomId"].ToString();
@@ -83,6 +76,16 @@ public class PrimaryHub : BaseHub {
         HashEntry[] connections = _redis.HashGetAll(roomConnectionKey);
         foreach (HashEntry connection in connections) {
             await Clients.Client(connection.Name).SendAsync("AddUser", username);
+        }
+
+        if (authenticated) {
+            await recentRoomService.Add(new RecentRoom {
+                RoomId = parsedRoomId,
+                UserId = username,
+                VisitDateTime = DateTime.UtcNow
+            });
+
+            _ = roomService.SaveChanges(); // do not await this; we don't care if it fails nor how long it takes (its not important)
         }
         await base.OnConnectedAsync();
     }
@@ -116,10 +119,10 @@ public class PrimaryHub : BaseHub {
         }
         _redis.HashSet(roomId, RedisKeys.RoomCurrentTimeField(), time);
         if (counter >= 5 || skipCounter) {
-            Room? room = await _roomService.GetRoomById(parsedRoomId);
+            Room? room = await roomService.GetRoomById(parsedRoomId);
             if (room == null) return;
             room.CurrentTime = time;
-            await _roomService.SaveChanges();
+            await roomService.SaveChanges();
             _redis.HashDelete(roomId, RedisKeys.RoomUpdateTimeCounterField());
         }
     }
@@ -143,26 +146,26 @@ public class PrimaryHub : BaseHub {
             return;
         }
         var parsedRoomId = Guid.Parse(roomId);
-        Room? room = await _roomService.GetRoomById(parsedRoomId);
+        Room? room = await roomService.GetRoomById(parsedRoomId);
         if (room == null) return;
         
         QueueItem? latestQueueItem = room.CurrentVideo();
         if (latestQueueItem == null || latestQueueItem.Id != videoId) return;
 
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, Context.GetHttpContext().Request, room, latestQueueItem);
+        await QueueHelper.RemoveRoomVideo(queueItemService, _redis, roomService, Clients, Context.GetHttpContext().Request, room, latestQueueItem);
     }
 
     public async Task DeleteVideo(Guid videoId) {
         string? roomId = Context.GetHttpContext()?.Request.Query["roomId"];
         if (roomId == null) return;
         var parsedRoomId = Guid.Parse(roomId);
-        Room? room = await _roomService.GetRoomById(parsedRoomId);
+        Room? room = await roomService.GetRoomById(parsedRoomId);
         if (room == null) return;
 
-        QueueItem? queueItem = await _queueItemService.GetQueueItemById(videoId);
+        QueueItem? queueItem = await queueItemService.GetQueueItemById(videoId);
         if (queueItem == null || queueItem.Room.Id != parsedRoomId) return;
 
-        await QueueHelper.RemoveRoomVideo(_queueItemService, _redis, _roomService, Clients, Context.GetHttpContext().Request, room, queueItem);
+        await QueueHelper.RemoveRoomVideo(queueItemService, _redis, roomService, Clients, Context.GetHttpContext().Request, room, queueItem);
     }
 
     private async Task StatusUpdate(Status status) {
