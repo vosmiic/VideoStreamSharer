@@ -1,8 +1,8 @@
-import Home from "./Components/Home.tsx";
-import Register from "./Components/Auth/Register.tsx";
-import Login from "./Components/Auth/Login.tsx";
-import Room from "./Components/Room.tsx";
-import Index from "./Components/Stream/Index.tsx";
+import Home from "./Components/Home";
+import Register from "./Components/Auth/Register";
+import Login from "./Components/Auth/Login";
+import Room from "./Components/Room";
+import Index from "./Components/Stream/Index";
 
 const AppRoutes = [
     {

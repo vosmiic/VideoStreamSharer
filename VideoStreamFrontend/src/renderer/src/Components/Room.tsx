@@ -1,8 +1,8 @@
-import {HubContext} from "../Contexts/HubContext.tsx";
+import {HubContext} from "../Contexts/HubContext";
 import {HubConnectionBuilder, HubConnectionState} from "@microsoft/signalr";
-import {API_URL} from "../Constants/constants.tsx";
+import {API_URL} from "../Constants/constants";
 import {useParams} from "react-router-dom";
-import RoomBody from "./RoomBody.tsx";
+import RoomBody from "./RoomBody";
 import {useEffect, useMemo} from "react";
 
 
@@ -26,6 +26,10 @@ export default function Room() {
             }
         };
     }, [hubConnection]);
+
+    if (!params.roomId) {
+        return <div>Room ID is required</div>;
+    }
 
     return <HubContext.Provider value={hubConnection}>
         <RoomBody roomId={params.roomId} />

@@ -1,6 +1,6 @@
 import {useRef} from "react";
-import Users from "./Users.tsx";
-import Chat from "./Chat.tsx";
+import Users from "./Users";
+import Chat from "./Chat";
 
 export default function RoomRightPanel(prop : { users: string[] }) {
     const selectedItem = useRef<string>("chat");

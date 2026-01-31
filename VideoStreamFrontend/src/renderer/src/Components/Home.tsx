@@ -1,10 +1,10 @@
 import {useEffect, useState} from "react";
 import {Button, Input} from "@headlessui/react";
-import * as constants from "../Constants/constants.tsx";
+import * as constants from "../Constants/constants";
 import {useNavigate} from "react-router-dom";
-import {IHome, IRoomName} from "../Interfaces/IHome.tsx";
-import {GetHomeInfo} from "../Helpers/ApiCalls.tsx";
-import {RecentRoomsCookieName} from "../Constants/constants.tsx";
+import {IHome, IRoomName} from "../Interfaces/IHome";
+import {GetHomeInfo} from "../Helpers/ApiCalls";
+import {RecentRoomsCookieName} from "../Constants/constants";
 
 export default function Home() {
     const navigation = useNavigate();

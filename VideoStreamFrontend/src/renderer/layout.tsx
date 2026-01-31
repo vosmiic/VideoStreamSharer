@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
-import {GetLoginInfo, Logout} from "./src/Helpers/ApiCalls.tsx";
-import {ILoggedInUser} from "./src/Interfaces/ILoggedInUser.tsx";
+import {GetLoginInfo, Logout} from "./src/Helpers/ApiCalls";
+import {ILoggedInUser} from "./src/Interfaces/ILoggedInUser";
 
 export default function Layout({ children } : { children }) {
     const [username, setUsername] = useState<string | null>(null);

@@ -1,9 +1,9 @@
 import {useSortable} from "@dnd-kit/sortable";
 import {CSS} from "@dnd-kit/utilities";
 import {useContext} from "react";
-import {IQueue} from "../../Interfaces/IQueue.tsx";
+import {IQueue} from "../../Interfaces/IQueue";
 import {TrashIcon} from "@heroicons/react/24/solid";
-import {HubContext} from "../../Contexts/HubContext.tsx";
+import {HubContext} from "../../Contexts/HubContext";
 
 export default function QueueItem(props: { key : string, queueItem : IQueue}) {
     const hub = useContext(HubContext);

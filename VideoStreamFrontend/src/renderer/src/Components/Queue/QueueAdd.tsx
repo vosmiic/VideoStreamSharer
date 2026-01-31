@@ -1,9 +1,9 @@
 import {ChangeEvent, useContext, useRef, useState} from "react";
 import {Button, Input} from "@headlessui/react";
-import {AddToQueue, Lookup, UploadVideo} from "../../Helpers/ApiCalls.tsx";
-import {RoomContext} from "../../Contexts/RoomContext.tsx";
-import {ILookup} from "../../Interfaces/ILookup.tsx";
-import {IQueueAdd} from "../../Interfaces/IQueueAdd.tsx";
+import {AddToQueue, Lookup, UploadVideo} from "../../Helpers/ApiCalls";
+import {RoomContext} from "../../Contexts/RoomContext";
+import {ILookup} from "../../Interfaces/ILookup";
+import {IQueueAdd} from "../../Interfaces/IQueueAdd";
 
 export default function QueueAdd() {
     const roomId: string = useContext(RoomContext);
@@ -47,7 +47,8 @@ export default function QueueAdd() {
             .then((result) => {
                 if (result.ok) {
                     setAddingVideo(false);
-                    modal.current.close();
+                    if (modal.current)
+                        modal.current.close();
                 } else {
                     // todo alert user of failure using toast
                 }
@@ -55,6 +56,10 @@ export default function QueueAdd() {
     }
 
     async function handleOnUpload(e: ChangeEvent<HTMLInputElement>) {
+        if (!e.target.files) {
+            console.log("No files detected to upload");
+            return;
+        }
         setAddingVideo(true);
         const data = new FormData();
         const videoData = e.target.files[0];
@@ -63,7 +68,8 @@ export default function QueueAdd() {
             .then((result) => {
                 if (result.ok) {
                     console.log("ok");
-                    modal.current.close();
+                    if (modal.current)
+                        modal.current.close();
                 } else {
                     result.text().then((text) => {
                         console.log(text);
@@ -75,7 +81,8 @@ export default function QueueAdd() {
     }
 
     function handleOpenModel() {
-        modal.current.showModal();
+        if (modal.current)
+            modal.current.showModal();
     }
 
     function handleCloseModel() {

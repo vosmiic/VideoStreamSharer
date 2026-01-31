@@ -1,10 +1,10 @@
 import {useParams} from "react-router-dom";
 import {useEffect, useRef, useState} from "react";
-import {GetStream} from "../../Helpers/ApiCalls.tsx";
-import {IStream} from "../../Interfaces/IStream.tsx";
-import MediaMTXWebRTCReader from "../../Helpers/MediaMTXWebRTCReader.tsx";
+import {GetStream} from "../../Helpers/ApiCalls";
+import {IStream} from "../../Interfaces/IStream";
+import MediaMTXWebRTCReader from "../../Helpers/MediaMTXWebRTCReader";
 import {HubConnectionBuilder, HubConnectionState} from "@microsoft/signalr";
-import {API_URL} from "../../Constants/constants.tsx";
+import {API_URL} from "../../Constants/constants";
 
 export default function Index() {
     const params = useParams();
@@ -21,6 +21,7 @@ export default function Index() {
     }
 
     useEffect(() => {
+        if (!params.userId) return;
         GetStream(params.userId).then((response : Response) => {
             if (response.ok) {
                 response.json().then((json : IStream) => {
@@ -32,13 +33,15 @@ export default function Index() {
                         },
                         onTrack: (evt) => {
                             setIsLive(true);
-                            videoPlayerRef.current.srcObject = evt.streams[0];
-                            videoPlayerRef.current.play().catch((error) => {
-                                if (error.name == "NotAllowedError") {
-                                    videoPlayerRef.current.volume = 0;
-                                    videoPlayerRef.current.play();
-                                }
-                            });
+                            if (videoPlayerRef.current) {
+                                videoPlayerRef.current.srcObject = evt.streams[0];
+                                videoPlayerRef.current.play().catch((error) => {
+                                    if (videoPlayerRef.current && error.name == "NotAllowedError") {
+                                        videoPlayerRef.current.volume = 0;
+                                        videoPlayerRef.current.play();
+                                    }
+                                });
+                            }
                         },
                     });
                 })
@@ -58,13 +61,15 @@ export default function Index() {
                     },
                     onTrack: (evt) => {
                         setIsLive(true);
-                        videoPlayerRef.current.srcObject = evt.streams[0];
-                        videoPlayerRef.current.play().catch((error) => {
-                            if (error.name == "NotAllowedError") {
-                                videoPlayerRef.current.volume = 0;
-                                videoPlayerRef.current.play();
-                            }
-                        });
+                        if (videoPlayerRef.current) {
+                            videoPlayerRef.current.srcObject = evt.streams[0];
+                            videoPlayerRef.current.play().catch((error) => {
+                                if (videoPlayerRef.current && error.name == "NotAllowedError") {
+                                    videoPlayerRef.current.volume = 0;
+                                    videoPlayerRef.current.play();
+                                }
+                            });
+                        }
                     },
                 });
             }
@@ -72,9 +77,14 @@ export default function Index() {
 
         hubConnection.on("Offline", () => {
             setIsLive(false);
-            videoPlayerRef.current.pause();
+            if (videoPlayerRef.current)
+                videoPlayerRef.current.pause();
         })
     }, [hubConnection, streamData?.OutputUrl])
+
+    if (params.userId == undefined) {
+        return <div>User ID not provided</div>
+    }
 
     return <div className={"flex"}>
         <div className={"flex w-4/5 flex-col"}>

@@ -1,5 +1,5 @@
 import {useContext, useEffect, useState} from "react";
-import {HubContext} from "../Contexts/HubContext.tsx";
+import {HubContext} from "../Contexts/HubContext";
 
 export default function Users(prop : { users: string[] }) {
     const hub = useContext(HubContext);

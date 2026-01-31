@@ -40,6 +40,6 @@ export default function Register() {
 }
 
 export class RegisterBody {
-    email : string;
-    password : string;
+    email : string | undefined;
+    password : string | undefined;
 }

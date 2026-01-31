@@ -1,4 +1,12 @@
-import {closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors} from "@dnd-kit/core";
+import {
+    closestCenter,
+    DndContext, DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    UniqueIdentifier,
+    useSensor,
+    useSensors
+} from "@dnd-kit/core";
 import {useContext, useEffect, useState} from "react";
 import {
     arrayMove,
@@ -6,13 +14,13 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy
 } from "@dnd-kit/sortable";
-import QueueItem from "./QueueItem.tsx";
-import QueueAdd from "./QueueAdd.tsx";
-import {IQueue} from "../../Interfaces/IQueue.tsx";
-import {ChangeQueueOrder} from "../../Helpers/ApiCalls.tsx";
-import {RoomContext} from "../../Contexts/RoomContext.tsx";
-import {HubContext} from "../../Contexts/HubContext.tsx";
-import {QueueOrder} from "../../Models/QueueOrder.tsx";
+import QueueItem from "./QueueItem";
+import QueueAdd from "./QueueAdd";
+import {IQueue} from "../../Interfaces/IQueue";
+import {ChangeQueueOrder} from "../../Helpers/ApiCalls";
+import {RoomContext} from "../../Contexts/RoomContext";
+import {HubContext} from "../../Contexts/HubContext";
+import {QueueOrder} from "../../Models/QueueOrder";
 
 export default function Queue(params: {queueItems : IQueue[], setQueueItems: (queue: IQueue[]) => void}) {
     const roomId = useContext(RoomContext);
@@ -25,19 +33,19 @@ export default function Queue(params: {queueItems : IQueue[], setQueueItems: (qu
         })
     );
 
-    function handleDragEnd(event) {
+    function handleDragEnd(event : DragEndEvent) {
         setDisableDragging(true);
         const beingMoved = event.active;
         const to = event.over;
-        let newQueue = [];
+        let newQueue : IQueue[] = [];
 
-        if (beingMoved.id !== to.id) {
+        if (beingMoved && to && beingMoved.id !== to.id) {
             const queueItemsIds = params.queueItems.map(queueItem => queueItem.Id);
-            const oldIndex = queueItemsIds.indexOf(beingMoved.id);
-            const newIndex = queueItemsIds.indexOf(to.id);
+            const oldIndex = queueItemsIds.indexOf(beingMoved.id.toString());
+            const newIndex = queueItemsIds.indexOf(to.id.toString());
 
             newQueue = arrayMove(params.queueItems, oldIndex, newIndex);
-            for (var i = 0; i < newQueue.length; i++) {
+            for (let i = 0; i < newQueue.length; i++) {
                 newQueue[i].Order = i;
             }
             params.setQueueItems(newQueue);
@@ -71,10 +79,13 @@ export default function Queue(params: {queueItems : IQueue[], setQueueItems: (qu
         });
 
         hub.on("QueueOrderChanged", (Queue : {Id : string, Order : number}[]) => {
-            let newQueue : IQueue[] = [];
+            const newQueue : IQueue[] = [];
             for (let x = 0; x < Queue.length; x++) {
-                let newItem = params.queueItems.find(item => item.Id == Queue[x].Id);
-                if (!newItem) console.log("Error: cannot change queue order");
+                const newItem = params.queueItems.find(item => item.Id == Queue[x].Id);
+                if (!newItem) {
+                    console.log("Error: cannot change queue order");
+                    continue;
+                }
                 newItem.Order = Queue[x].Order;
                 newQueue.push(newItem);
             }
@@ -90,7 +101,7 @@ export default function Queue(params: {queueItems : IQueue[], setQueueItems: (qu
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}>
             <div className={`grid grid-cols-1 gap-4 ${disableDragging ? "pointer-events-none" : ""}`}>
-                <SortableContext items={params.queueItems} strategy={verticalListSortingStrategy}>
+                <SortableContext items={params.queueItems.map(item => item.Id as UniqueIdentifier)} strategy={verticalListSortingStrategy}>
                     {params.queueItems.sort(sortQueueItems).map(item => <QueueItem key={item.Id} queueItem={item} />)}
                 </SortableContext>
             </div>

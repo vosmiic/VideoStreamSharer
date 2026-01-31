@@ -1,18 +1,18 @@
 import {useContext, useEffect, useMemo, useState} from "react";
-import * as apiCalls from "../Helpers/ApiCalls.tsx";
-import NotFound from "./NotFound.tsx";
-import Loading from "./Loading.tsx";
-import {GetRoomResponse} from "../Interfaces/IRoom.tsx";
-import Queue from "./Queue/Queue.tsx";
-import {RoomContext} from "../Contexts/RoomContext.tsx";
-import {HubContext} from "../Contexts/HubContext.tsx";
+import * as apiCalls from "../Helpers/ApiCalls";
+import NotFound from "./NotFound";
+import Loading from "./Loading";
+import {GetRoomResponse} from "../Interfaces/IRoom";
+import Queue from "./Queue/Queue";
+import {RoomContext} from "../Contexts/RoomContext";
+import {HubContext} from "../Contexts/HubContext";
 import {HubConnectionState} from "@microsoft/signalr";
-import FilePlayer from "./Players/FilePlayer.tsx";
-import {RecentRoomsCookieName, VideoStatus, MaxRecentRoomsCount} from "../Constants/constants.tsx";
-import {IQueue} from "../Interfaces/IQueue.tsx";
-import StreamUrl from "../Models/StreamUrl.tsx";
-import RoomRightPanel from "./RoomRightPanel.tsx";
-import {IRoomName} from "../Interfaces/IHome.tsx";
+import FilePlayer from "./Players/FilePlayer";
+import {RecentRoomsCookieName, VideoStatus, MaxRecentRoomsCount} from "../Constants/constants";
+import {IQueue} from "../Interfaces/IQueue";
+import StreamUrl from "../Models/StreamUrl";
+import RoomRightPanel from "./RoomRightPanel";
+import {IRoomName} from "../Interfaces/IHome";
 
 export default function RoomBody(params: {roomId: string}) {
     const hub = useContext(HubContext);
@@ -66,8 +66,8 @@ export default function RoomBody(params: {roomId: string}) {
                                         cookieStore.set(cookieOptions).catch((e) => console.log(e));
                                         console.log(cookieOptions);
                                     } else {
-                                        let existingCookieItem = JSON.parse(recentRoomsCookieItem.value) as Array<IRoomName>;
-                                        let existingRoomName = existingCookieItem.find(roomName => roomName.Id == params.roomId);
+                                        const existingCookieItem = JSON.parse(recentRoomsCookieItem.value) as Array<IRoomName>;
+                                        const existingRoomName = existingCookieItem.find(roomName => roomName.Id == params.roomId);
                                         moveRoomToMostRecent(existingCookieItem, existingRoomName ?? newCookieItem, existingRoomName !== undefined);
                                         cookieOptions.value = JSON.stringify(existingCookieItem);
                                         cookieStore.set(cookieOptions);
